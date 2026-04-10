@@ -1,0 +1,447 @@
+groups:
+  - name: los-platform.alerts
+    rules:
+
+      # ── Availability ──────────────────────────────────────────────────────────
+      - alert: LOSServiceDown
+        expr: up{job=~"los-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "LOS service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-service-down"
+
+      - alert: LOSMultipleServicesDown
+        expr: count(up{job=~"los-.*"} == 0) by (env) >= 2
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "Multiple LOS services are down in {{ $labels.env }}"
+          description: "{{ $value }} LOS services are unavailable. Check Kubernetes cluster and service health."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-multiple-down"
+
+      - alert: LOSHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job=~"los-.*", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job=~"los-.*"}[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          component: api
+        annotations:
+          summary: "High 5xx error rate on LOS services"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 1%) on {{ $labels.service }}. Top error routes: {{ $labels.route }}"
+          runbook_url: "https://wiki.bank.internal/runbooks/los-high-errors"
+
+      - alert: LOSAuthServiceHighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job=~"los-auth.*", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job=~"los-auth.*"}[5m]))
+          ) > 0.001
+        for: 2m
+        labels:
+          severity: warning
+          team: platform
+          component: auth
+        annotations:
+          summary: "Auth service error rate elevated"
+          description: "Auth service 5xx rate is {{ $value | humanizePercentage }}"
+
+      # ── Latency ──────────────────────────────────────────────────────────────
+      - alert: LOSHighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job=~"los-.*"}[5m])) by (le, service)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: api
+        annotations:
+          summary: "High P95 latency on {{ $labels.service }}"
+          description: "P95 latency is {{ $value | humanizeDuration }} (threshold: 2s). Check slow queries, upstream dependencies, and connection pool saturation."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-high-latency"
+
+      - alert: LOSCriticalLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{job=~"los-.*"}[5m])) by (le, service)
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          component: api
+        annotations:
+          summary: "Critical P99 latency on {{ $labels.service }}"
+          description: "P99 latency is {{ $value | humanizeDuration }} (threshold: 5s). Investigate immediately."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-critical-latency"
+
+      # ── Kafka ────────────────────────────────────────────────────────────────
+      - alert: LOSKafkaConsumerLagHigh
+        expr: kafka_consumer_records_lag_max{job=~"los-.*"} > 100000
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          component: messaging
+        annotations:
+          summary: "Kafka consumer lag is high on topic {{ $labels.topic }}"
+          description: "Consumer lag on {{ $labels.topic }} is {{ $value }} messages. Service may fall behind on processing."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-kafka-lag"
+
+      - alert: LOSKafkaConsumerLagCritical
+        expr: kafka_consumer_records_lag_max{job=~"los-.*"} > 500000
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          component: messaging
+        annotations:
+          summary: "Kafka consumer lag critical on topic {{ $labels.topic }}"
+          description: "Consumer lag on {{ $labels.topic }} is {{ $value }} messages. Investigate immediately."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-kafka-lag-critical"
+
+      - alert: LOSKafkaProducerErrorRate
+        expr: |
+          sum(rate(kafka_producer_record_send_errors_total{job=~"los-.*"}[5m])) by (topic)
+          /
+          sum(rate(kafka_producer_record_send_total{job=~"los-.*"}[5m])) by (topic)
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: messaging
+        annotations:
+          summary: "Kafka producer error rate on {{ $labels.topic }}"
+          description: "Producer error rate is {{ $value | humanizePercentage }}. Messages may be dropped."
+
+      - alert: LOSKafkaTopicWithoutLeader
+        expr: kafka_controller_kafkacontroller_activecontrollercount{job=~"los-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: messaging
+        annotations:
+          summary: "Kafka cluster has no active controller"
+          description: "Kafka cluster has lost its active controller. Check broker health immediately."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-kafka-controller"
+
+      # ── Database ────────────────────────────────────────────────────────────
+      - alert: LOSPostgresHighConnectionUsage
+        expr: |
+          sum(pg_stat_activity_count{datname=~"los.*"}) by (datname)
+          /
+          sum(pg_settings{name="max_connections"}) by (datname)
+          > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: database
+        annotations:
+          summary: "PostgreSQL connection pool near capacity on {{ $labels.datname }}"
+          description: "Database {{ $labels.datname }} is using {{ $value | humanizePercentage }} of max connections. Risk of connection exhaustion."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-pg-connections"
+
+      - alert: LOSPostgresConnectionExhausted
+        expr: |
+          sum(pg_stat_activity_count{datname=~"los.*"}) by (datname)
+          /
+          sum(pg_settings{name="max_connections"}) by (datname)
+          > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: database
+        annotations:
+          summary: "PostgreSQL connections exhausted on {{ $labels.datname }}"
+          description: "Database {{ $labels.datname }} has used {{ $value | humanizePercentage }} of max connections. New connections will fail."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-pg-connections"
+
+      - alert: LOSPostgresSlowQueries
+        expr: |
+          rate(pg_stat_statements_mean_exec_time_sum{job=~"los-.*"}[5m])
+          /
+          rate(pg_stat_statements_mean_exec_time_count{job=~"los-.*"}[5m])
+          > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: database
+        annotations:
+          summary: "PostgreSQL slow query average above 1s on {{ $labels.datname }}"
+          description: "Mean query execution time is {{ $value | humanizeDuration }}. Check for missing indexes or query plan changes."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-pg-slow-queries"
+
+      - alert: LOSPostgresReplicationLag
+        expr: pg_replication_lag_seconds{job=~"los-.*"} > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: database
+        annotations:
+          summary: "PostgreSQL replication lag is high"
+          description: "Replica is {{ $value | humanizeDuration }} behind primary. Risk of data inconsistency on failover."
+
+      # ── Redis ──────────────────────────────────────────────────────────────
+      - alert: LOSRedisHighMemoryUsage
+        expr: redis_memory_used_bytes{job=~"los-.*"} / redis_memory_max_bytes{job=~"los-.*"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: cache
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}. Check for memory leaks or adjust maxmemory policy."
+
+      - alert: LOSRedisOOM
+        expr: redis_memory_used_bytes{job=~"los-.*"} / redis_memory_max_bytes{job=~"los-.*"} > 0.98
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: cache
+        annotations:
+          summary: "Redis out of memory"
+          description: "Redis is at {{ $value | humanizePercentage }} memory. Key evictions or failures imminent."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-redis-oom"
+
+      - alert: LOSRedisConnectionErrors
+        expr: rate(redis_rejected_connections_total{job=~"los-.*"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          component: cache
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis rejected {{ $value }} connections/sec. Check connection pool settings and maxclients."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-redis-oom"
+
+      # ── Business Metrics ─────────────────────────────────────────────────────
+      - alert: LOSApplicationThroughputDrop
+        expr: |
+          sum(increase(los_loan_applications_created_total[15m])) < 1
+          and
+          sum(increase(los_loan_applications_created_total[1h] offset 1h)) > 10
+        for: 30m
+        labels:
+          severity: warning
+          team: business
+          component: loan-service
+        annotations:
+          summary: "Application intake has dropped significantly"
+          description: "No new loan applications in the last 30 minutes. Normal hourly rate is >10. Check upstream systems (DSA portal, online portal)."
+
+      - alert: LOSBureauPullSuccessRateLow
+        expr: |
+          sum(rate(los_bureau_pulls_total{status="SUCCESS"}[15m]))
+          /
+          sum(rate(los_bureau_pulls_total[15m]))
+          < 0.85
+        for: 15m
+        labels:
+          severity: warning
+          team: integrations
+          component: integration-service
+        annotations:
+          summary: "Bureau pull success rate is low"
+          description: "Bureau pull success rate is {{ $value | humanizePercentage }} (threshold: 85%). Check bureau API connectivity and credentials."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-bureau-failures"
+
+      - alert: LOSDecisionEngineDown
+        expr: |
+          sum(rate(http_requests_total{job=~"los-decision.*", status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total{job=~"los-decision.*"}[5m]))
+          > 0.1
+        for: 3m
+        labels:
+          severity: critical
+          team: business
+          component: decision-engine
+        annotations:
+          summary: "Decision Engine is unavailable or returning errors"
+          description: "Decision Engine error rate is {{ $value | humanizePercentage }}. No new credit decisions can be made."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-decision-engine-down"
+
+      - alert: LOSDisbursementSuccessRateLow
+        expr: |
+          sum(rate(los_disbursements_total{status="SUCCESS"}[30m]))
+          /
+          sum(rate(los_disbursements_total[30m]))
+          < 0.90
+        for: 30m
+        labels:
+          severity: warning
+          team: integrations
+          component: integration-service
+        annotations:
+          summary: "Disbursement success rate is low"
+          description: "Disbursement success rate is {{ $value | humanizePercentage }}. Check NPCI/CBS connectivity."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-disbursement-failures"
+
+      - alert: LOSPDDOverdueRateHigh
+        expr: |
+          sum(increase(los_pdd_items_overdue_total[24h]))
+          /
+          sum(increase(los_pdd_items_total[24h]))
+          > 0.20
+        for: 1h
+        labels:
+          severity: warning
+          team: operations
+          component: loan-service
+        annotations:
+          summary: "PDD overdue rate is above 20%"
+          description: "{{ $value | humanizePercentage }} of PDD items are overdue. Contact loan officers for follow-up."
+
+      # ── K8s / Infrastructure ────────────────────────────────────────────────
+      - alert: LOSPodRestartingFrequently
+        expr: |
+          increase(kube_pod_container_status_restarts_total{job=~"los-.*", namespace=~"los-platform.*"}[1h])
+          > 5
+        for: 0m
+        labels:
+          severity: warning
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "Pod {{ $labels.pod }} restarted {{ $value }} times in 1h"
+          description: "Container in pod {{ $labels.pod }} (deployment {{ $labels.deployment }}) is restarting frequently. Check OOMKilled, crash loops, or liveness probe failures."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-pod-restarts"
+
+      - alert: LOSPodOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled", job=~"los-.*"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "Pod {{ $labels.pod }} was OOM killed"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} exceeded memory limit. Increase memory request/limit."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-pod-oom"
+
+      - alert: LOSHighCPUUsage
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total{
+            job=~"kubelet",
+            namespace=~"los-platform.*",
+            container!="",
+            container!="POD"
+          }[5m])) by (namespace, pod)
+          /
+          sum(kube_pod_container_resource_limits{
+            job=~"kubelet",
+            namespace=~"los-platform.*",
+            resource="cpu"
+          }[5m])) by (namespace, pod)
+          > 0.90
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "Pod {{ $labels.pod }} CPU near limit"
+          description: "CPU usage is {{ $value | humanizePercentage }} of limit. Consider scaling horizontally or increasing limits."
+
+      - alert: LOSHPAAtMaxReplicas
+        expr: |
+          kube_hpa_status_current_replicas{
+            namespace=~"los-platform.*"
+          }
+          ==
+          kube_hpa_spec_max_replicas{
+            namespace=~"los-platform.*"
+          }
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          component: infrastructure
+        annotations:
+          summary: "HPA for {{ $labels.hpa }} is at max replicas"
+          description: "HPA {{ $labels.hpa }} has been at max {{ $value }} replicas for 10 minutes. Load is sustained high. Consider adjusting min/max replicas or adding capacity."
+
+      # ── SLA / SLO ──────────────────────────────────────────────────────────
+      - alert: LOSAvailabilitySLOBreaching
+        expr: |
+          (
+            sum(rate(http_requests_total{job=~"los-.*", status!~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total{job=~"los-.*"}[1h]))
+          )
+          < 0.995
+        for: 15m
+        labels:
+          severity: critical
+          team: platform
+          component: slo
+        annotations:
+          summary: "LOS Platform availability SLO is breaching"
+          description: "Availability over the last hour is {{ $value | humanizePercentage }} (target: 99.5%). Error budget is being consumed."
+
+      - alert: LOSLatencySLOBreaching
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job=~"los-.*"}[1h])) by (le)
+          ) > 1.5
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+          component: slo
+        annotations:
+          summary: "LOS Platform latency SLO is breaching"
+          description: "P95 latency over the last hour is {{ $value | humanizeDuration }} (target: 1.5s). Check for degraded dependencies."
+
+      # ── Security ─────────────────────────────────────────────────────────────
+      - alert: LOSHighAuthFailureRate
+        expr: |
+          sum(rate(http_requests_total{job=~"los-auth.*", status="401"}[5m]))
+          /
+          sum(rate(http_requests_total{job=~"los-auth.*"}[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          component: auth
+        annotations:
+          summary: "High authentication failure rate on auth service"
+          description: "Auth failure rate is {{ $value | humanizePercentage }}. Possible brute-force attack or credential stuffing. Check logs."
+          runbook_url: "https://wiki.bank.internal/runbooks/los-auth-failures"
+
+      - alert: LOSRateLimitTriggered
+        expr: increase(http_requests_total{job=~"los-.*", status="429"}[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+          component: security
+        annotations:
+          summary: "Rate limiting triggered on LOS services"
+          description: "{{ $value }} rate-limited requests in the last 5 minutes. Possible abuse or misconfigured client."

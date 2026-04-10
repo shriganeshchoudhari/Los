@@ -1,0 +1,73 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - /etc/prometheus/rules/*.yaml
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'loan-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['loan-service:3003']
+        labels:
+          service: loan-service
+
+  - job_name: 'kyc-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['kyc-service:3002']
+        labels:
+          service: kyc-service
+
+  - job_name: 'decision-engine'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['decision-engine:3004']
+        labels:
+          service: decision-engine
+
+  - job_name: 'document-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['document-service:3005']
+        labels:
+          service: document-service
+
+  - job_name: 'auth-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['auth-service:3001']
+        labels:
+          service: auth-service
+
+  - job_name: 'notification-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['notification-service:3006']
+        labels:
+          service: notification-service
+
+  - job_name: 'integration-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['integration-service:3007']
+        labels:
+          service: integration-service
+
+  - job_name: 'dsa-service'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['dsa-service:3008']
+        labels:
+          service: dsa-service

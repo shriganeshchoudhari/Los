@@ -1,0 +1,230 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-service
+  labels:
+    app: los
+    service: document-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: los
+      service: document-service
+  template:
+    metadata:
+      labels:
+        app: los
+        service: document-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3009"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: los-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: document-service
+          image: ${ECR_REGISTRY}/document-service:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3009
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3009"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: DB_HOST
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              value: "los_document"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: KAFKA_BROKERS
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: REDIS_PORT
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: MINIO_ENDPOINT
+            - name: MINIO_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: MINIO_PORT
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: MINIO_ACCESS_KEY
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: MINIO_SECRET_KEY
+            - name: MINIO_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: MINIO_BUCKET
+            - name: KARZA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: KARZA_API_KEY
+            - name: SIGNZY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: SIGNZY_API_KEY
+            - name: OTEL_SERVICE_NAME
+              value: "document-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector:4318"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_always_on"
+            - name: OTEL_PROPAGATORS
+              value: "b3,tracecontext"
+            - name: NODE_OPTIONS
+              value: "-r @opentelemetry/auto-instrumentations-node/register"
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "250m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: los
+              service: document-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-service
+  labels:
+    app: los
+    service: document-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3009
+      targetPort: 3009
+      protocol: TCP
+      name: http
+  selector:
+    app: los
+    service: document-service
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: document-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: document-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: document-service
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: los
+      service: document-service

@@ -1,0 +1,81 @@
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+!.env.example
+!.env.example.local
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.nx/
+
+# Test results
+coverage/
+playwright-report/
+playwright-report-security/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Terraform (infra secrets)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Kubernetes (local kubeconfig)
+kubeconfig-*
+*.kubeconfig
+
+# Secrets
+*.pem
+*.key
+*.crt
+secrets.yaml
+secrets.yml
+
+# Local development
+.local/
+tmp/
+temp/
+*.local
+
+# S3/MinIO
+.minio/
+
+# Kafka offsets
+__consumer_offsets/
+
+# Vault
+.vault/
+
+# Database dumps
+*.sql.bak
+*.dump
+*.pg_dump
+
+# OpenAPI/specs auto-generated
+generated/

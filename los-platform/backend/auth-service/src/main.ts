@@ -1,0 +1,71 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter, initTracing, shutdownTracing, TracingMiddleware } from '@los/common';
+
+async function bootstrap() {
+  initTracing('auth-service', '1.0.0');
+
+  const logger = new Logger('Bootstrap');
+  const app = await NestFactory.create(AppModule);
+
+  app.use(TracingMiddleware);
+
+  const configService = app.get(ConfigService);
+  const port = configService.get<number>('PORT', 3001);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
+
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  app.enableCors({
+    origin: configService.get<string>('CORS_ORIGINS', '*'),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-ID',
+      'X-Idempotency-Key',
+      'traceparent',
+      'tracestate',
+      'b3',
+      'X-B3-TraceId',
+      'X-B3-SpanId',
+      'X-B3-Sampled',
+    ],
+    credentials: true,
+  });
+
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('LOS Platform - Auth Service')
+    .setDescription('Authentication and Authorization API')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
+
+  process.on('SIGTERM', async () => {
+    logger.log('SIGTERM received, shutting down gracefully...');
+    await shutdownTracing();
+    await app.close();
+    process.exit(0);
+  });
+
+  await app.listen(port);
+  logger.log(`Auth Service running on port ${port}`);
+}
+
+bootstrap();

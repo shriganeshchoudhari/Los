@@ -1,0 +1,215 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  labels:
+    app: los
+    service: notification-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: los
+      service: notification-service
+  template:
+    metadata:
+      labels:
+        app: los
+        service: notification-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3007"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: los-service
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: notification-service
+          image: ${ECR_REGISTRY}/notification-service:${IMAGE_TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3007
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3007"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: DB_HOST
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              value: "los_notification"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: KAFKA_BROKERS
+            - name: SMS_PROVIDER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: SMS_API_KEY
+            - name: SMS_SENDER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: SMS_SENDER_ID
+            - name: EMAIL_PROVIDER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: EMAIL_API_KEY
+            - name: EMAIL_FROM
+              valueFrom:
+                configMapKeyRef:
+                  name: los-config
+                  key: EMAIL_FROM
+            - name: WHATSAPP_PROVIDER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: WHATSAPP_API_KEY
+            - name: FCM_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: los-secrets
+                  key: FCM_SERVER_KEY
+            - name: OTEL_SERVICE_NAME
+              value: "notification-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector:4318"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_always_on"
+            - name: OTEL_PROPAGATORS
+              value: "b3,tracecontext"
+            - name: NODE_OPTIONS
+              value: "-r @opentelemetry/auto-instrumentations-node/register"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "400m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3007
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3007
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: los
+              service: notification-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  labels:
+    app: los
+    service: notification-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3007
+      targetPort: 3007
+      protocol: TCP
+      name: http
+  selector:
+    app: los
+    service: notification-service
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: los
+      service: notification-service

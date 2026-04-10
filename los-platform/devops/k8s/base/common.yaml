@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: los-config
+  namespace: los-platform
+data:
+  DB_HOST: "postgres.los-platform.svc.cluster.local"
+  REDIS_HOST: "redis.los-platform.svc.cluster.local"
+  KAFKA_BROKERS: "kafka.los-platform.svc.cluster.local:9092"
+  MINIO_ENDPOINT: "minio.los-platform.svc.cluster.local"
+  MINIO_PORT: "9000"
+  MINIO_BUCKET: "los-documents"
+  ENVIRONMENT: "production"
+  CBS_BASE_URL: "https://finacle.bank.internal:8080"
+  NPCI_BASE_URL: "https://npci.bank.internal"
+  SMS_SENDER_ID: "LOSBNK"
+  EMAIL_FROM: "noreply@losbank.in"
+  DSA_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001,https://dsa.losbank.in"
+  LDAP_URL: "ldap://ldap.bank.internal:389"
+  LDAP_BASE_DN: "dc=bank,dc=internal"
+  LDAP_USER_SEARCH_BASE: "ou=users,dc=bank,dc=internal"
+  LDAP_USER_FILTER: "(sAMAccountName={{username}})"
+  LDAP_USE_TLS: "false"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+  OTEL_TRACES_SAMPLER: "parentbased_always_on"
+  OTEL_PROPAGATORS: "b3,tracecontext"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: los-secrets
+  namespace: los-platform
+type: Opaque
+stringData:
+  DB_USERNAME: "los_user"
+  DB_PASSWORD: "CHANGE_IN_PRODUCTION"
+  JWT_SECRET: "CHANGE_IN_PRODUCTION_MIN_32_CHARS"
+  REDIS_PASSWORD: ""
+  SMS_API_KEY: ""
+  EMAIL_API_KEY: ""
+  WHATSAPP_API_KEY: ""
+  FCM_SERVER_KEY: ""
+  UIDAI_LICENSE_KEY: ""
+  CBS_USERNAME: ""
+  CBS_PASSWORD: ""
+  BUREAU_CIBIL_API_KEY: ""
+  BUREAU_EXPERIAN_API_KEY: ""
+  BUREAU_EQUIFAX_API_KEY: ""
+  BUREAU_CRIF_API_KEY: ""
+  NPCI_MERCHANT_ID: ""
+  NPCI_API_KEY: ""
+  DSA_JWT_SECRET: ""
+  ENCRYPTION_KEY: ""
+  LDAP_BIND_DN: ""
+  LDAP_BIND_PASSWORD: ""
+  DIGILOCKER_CLIENT_SECRET: ""
+  DIGILOCKER_CLIENT_ID: ""
+  DIGILOCKER_REDIRECT_URI: "https://los.losbank.in/auth/digilocker/callback"
+  MINIO_ACCESS_KEY: ""
+  MINIO_SECRET_KEY: ""
+  KARZA_API_KEY: ""
+  SIGNZY_API_KEY: ""
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: los-service
+  namespace: los-platform
+  labels:
+    app: los
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: los-service-network-policy
+  namespace: los-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: los
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kong
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+        - protocol: TCP
+          port: 3004
+        - protocol: TCP
+          port: 3005
+        - protocol: TCP
+          port: 3006
+        - protocol: TCP
+          port: 3007
+        - protocol: TCP
+          port: 3008
+        - protocol: TCP
+          port: 3009
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: los
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9092
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

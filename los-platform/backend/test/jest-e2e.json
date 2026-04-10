@@ -1,0 +1,20 @@
+module.exports = {
+  moduleFileExtensions: ['js', 'json', 'ts'],
+  rootDir: '.',
+  testEnvironment: 'node',
+  testRegex: '.e2e-spec.ts$',
+  transform: {
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
+  },
+  moduleNameMapper: {
+    '^@los/common$': '<rootDir>/../common/src',
+    '^@los/auth-service$': '<rootDir>/../auth-service/src',
+    '^@los/loan-service$': '<rootDir>/../loan-service/src',
+    '^@los/kyc-service$': '<rootDir>/../kyc-service/src',
+    '^@los/decision-engine$': '<rootDir>/../decision-engine/src',
+    '^@los/integration-service$': '<rootDir>/../integration-service/src',
+  },
+  globalSetup: '<rootDir>/setup.ts',
+  globalTeardown: '<rootDir>/teardown.ts',
+  testTimeout: 30000,
+};

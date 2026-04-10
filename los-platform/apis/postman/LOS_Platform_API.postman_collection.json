@@ -1,0 +1,2067 @@
+{
+  "info": {
+    "name": "LOS Platform API",
+    "description": "Loan Origination System — Full API Collection\n\n## Services\n- Auth Service: :3001\n- KYC Service: :3002\n- Loan Service: :3003\n- Document Service: :3004\n- Decision Engine: :3005\n- Integration Service: :3006\n- Notification Service: :3007\n- DSA Service: :3008",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001", "type": "string" },
+    { "key": "kycService", "value": "http://localhost:3002", "type": "string" },
+    { "key": "loanService", "value": "http://localhost:3003", "type": "string" },
+      {
+        "key": "documentService",
+        "value": "http://localhost:3009",
+        "type": "string"
+      },
+    { "key": "decisionService", "value": "http://localhost:3005", "type": "string" },
+    { "key": "integrationService", "value": "http://localhost:3006", "type": "string" },
+    { "key": "notificationService", "value": "http://localhost:3007", "type": "string" },
+    { "key": "dsaService", "value": "http://localhost:3008", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "dsaToken", "value": "", "type": "string" },
+    { "key": "mobile", "value": "9876543210", "type": "string" },
+    { "key": "sessionId", "value": "", "type": "string" },
+    { "key": "applicationId", "value": "", "type": "string" },
+    { "key": "applicationNumber", "value": "", "type": "string" },
+    { "key": "documentId", "value": "", "type": "string" },
+    { "key": "agreementId", "value": "", "type": "string" },
+    { "key": "esignTransactionId", "value": "", "type": "string" },
+    { "key": "panNumber", "value": "ABCDE1234F", "type": "string" },
+    { "key": "aadhaarNumber", "value": "123456789012", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "0. Health Checks",
+      "item": [
+        {
+          "name": "Auth Service Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "KYC Service Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{kycService}}/health", "host": ["{{kycService}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Loan Service Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{loanService}}/health", "host": ["{{loanService}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Decision Engine Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{decisionService}}/health", "host": ["{{decisionService}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Integration Service Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{integrationService}}/health", "host": ["{{integrationService}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "DSA Service Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{dsaService}}/health", "host": ["{{dsaService}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Auth Service",
+      "item": [
+        {
+          "name": "POST /auth/otp/send — Send OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success: true', () => pm.expect(pm.response.json().success).to.eq(true));",
+                  "pm.test('sessionId returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.sessionId).to.be.a('string');",
+                  "});",
+                  "if (pm.response.json().data?.sessionId) {",
+                  "  pm.collectionVariables.set('sessionId', pm.response.json().data.sessionId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"purpose\": \"LOGIN\",\n  \"channel\": \"SMS\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/otp/send", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "send"] }
+          }
+        },
+        {
+          "name": "POST /auth/otp/verify — Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('accessToken received', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.accessToken).to.be.a('string');",
+                  "});",
+                  "if (pm.response.json().data?.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', pm.response.json().data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', pm.response.json().data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"otp\": \"123456\",\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/otp/verify", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "verify"] }
+          }
+        },
+        {
+          "name": "POST /auth/ldap/login — Staff Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('accessToken received', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.accessToken).to.be.a('string');",
+                  "});",
+                  "if (pm.response.json().data?.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', pm.response.json().data.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"loan_officer_01\",\n  \"password\": \"BankPass123!\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/ldap/login", "host": ["{{baseUrl}}"], "path": ["auth", "ldap", "login"] }
+          }
+        },
+        {
+          "name": "POST /auth/token/refresh — Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('new accessToken', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.accessToken).to.be.a('string');",
+                  "});",
+                  "if (pm.response.json().data?.accessToken) {",
+                  "  pm.collectionVariables.set('accessToken', pm.response.json().data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', pm.response.json().data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/token/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "token", "refresh"] }
+          }
+        },
+        {
+          "name": "POST /auth/logout — Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          }
+        },
+        {
+          "name": "GET /.well-known/jwks.json — JWKS",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('keys array present', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.keys).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/.well-known/jwks.json", "host": ["{{baseUrl}}"], "path": [".well-known", "jwks.json"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Loan Service — Applications",
+      "item": [
+        {
+          "name": "POST /applications — Create Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('applicationId returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.applicationId).to.be.a('string');",
+                  "  pm.expect(d.applicationNumber).to.match(/^LOS-\\d{4}-[A-Z]{2}-\\d{6}$/);",
+                  "});",
+                  "if (pm.response.json().data?.applicationId) {",
+                  "  pm.collectionVariables.set('applicationId', pm.response.json().data.applicationId);",
+                  "  pm.collectionVariables.set('applicationNumber', pm.response.json().data.applicationNumber);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Request-ID", "value": "{{$guid}}" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanType\": \"PERSONAL_LOAN\",\n  \"channelCode\": \"MOBILE_APP\",\n  \"branchCode\": \"MH001\",\n  \"applicant\": {\n    \"fullName\": \"Ravi Sharma\",\n    \"dob\": \"1990-04-21\",\n    \"gender\": \"MALE\",\n    \"maritalStatus\": \"MARRIED\",\n    \"mobile\": \"{{mobile}}\",\n    \"email\": \"ravi.sharma@example.com\",\n    \"residentialStatus\": \"RESIDENT_INDIAN\",\n    \"addresses\": [{\n      \"line1\": \"Flat 302, Orchid Heights\",\n      \"city\": \"Pune\",\n      \"district\": \"Pune\",\n      \"state\": \"MH\",\n      \"pincode\": \"411057\",\n      \"country\": \"IN\",\n      \"addressType\": \"CURRENT\"\n    }],\n    \"yearsAtCurrentAddress\": 3,\n    \"ownOrRentedResidence\": \"RENTED\"\n  },\n  \"employmentDetails\": {\n    \"employmentType\": \"SALARIED_PRIVATE\",\n    \"employerName\": \"Infosys Limited\",\n    \"designation\": \"Senior Engineer\",\n    \"totalWorkExperienceMonths\": 84,\n    \"currentJobExperienceMonths\": 50,\n    \"grossMonthlyIncome\": 120000,\n    \"netMonthlyIncome\": 95000,\n    \"totalAnnualIncome\": 1440000\n  },\n  \"loanRequirement\": {\n    \"loanType\": \"PERSONAL_LOAN\",\n    \"requestedAmount\": 500000,\n    \"requestedTenureMonths\": 36,\n    \"purposeDescription\": \"Medical emergency\"\n  }\n}"
+            },
+            "url": { "raw": "{{loanService}}/applications", "host": ["{{loanService}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "GET /applications/:id — Get Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('application data', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.applicationId || d.id).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-Request-ID", "value": "{{$guid}}" }
+            ],
+            "url": { "raw": "{{loanService}}/applications/{{applicationId}}", "host": ["{{loanService}}"], "path": ["applications", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "PATCH /applications/:id — Update Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Request-ID", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"section\": \"APPLICANT\",\n  \"data\": {\n    \"email\": \"updated.email@example.com\"\n  },\n  \"version\": 1\n}"
+            },
+            "url": { "raw": "{{loanService}}/applications/{{applicationId}}", "host": ["{{loanService}}"], "path": ["applications", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "PATCH /applications/:id/autosave — Autosave",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"section\": \"EMPLOYMENT\",\n  \"data\": {\n    \"designation\": \"Lead Engineer\"\n  }\n}"
+            },
+            "url": { "raw": "{{loanService}}/applications/{{applicationId}}/autosave", "host": ["{{loanService}}"], "path": ["applications", "{{applicationId}}", "autosave"] }
+          }
+        },
+        {
+          "name": "GET /applications — List Applications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('content array present', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.content || d.data || d).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{loanService}}/applications?status=DRAFT&page=0&size=20",
+              "host": ["{{loanService}}"],
+              "path": ["applications"],
+              "query": [
+                { "key": "status", "value": "DRAFT" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /applications/:id/foir — FOIR Calculation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('foir present', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.foir || d.foirPercent).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/applications/{{applicationId}}/foir", "host": ["{{loanService}}"], "path": ["applications", "{{applicationId}}", "foir"] }
+          }
+        },
+        {
+          "name": "POST /applications/:id/submit — Submit Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-Request-ID", "value": "{{$guid}}" }
+            ],
+            "url": { "raw": "{{loanService}}/applications/{{applicationId}}/submit", "host": ["{{loanService}}"], "path": ["applications", "{{applicationId}}", "submit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Loan Service — EMI & Rates",
+      "item": [
+        {
+          "name": "POST /emi/calculate — Calculate EMI",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('emiAmount returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.emiAmount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"principal\": 500000,\n  \"annualRate\": 10.5,\n  \"tenureMonths\": 36\n}"
+            },
+            "url": { "raw": "{{loanService}}/emi/calculate", "host": ["{{loanService}}"], "path": ["emi", "calculate"] }
+          }
+        },
+        {
+          "name": "POST /emi/amortization — Amortization Schedule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('schedule returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.schedule || d).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"principal\": 500000,\n  \"annualRate\": 10.5,\n  \"tenureMonths\": 36,\n  \"startDate\": \"2026-05-01\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/emi/amortization", "host": ["{{loanService}}"], "path": ["emi", "amortization"] }
+          }
+        },
+        {
+          "name": "POST /emi/foreclosure — Foreclosure Calculation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('foreclosureAmount returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.foreclosureAmount || d.amount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanId\": \"{{applicationId}}\",\n  \"foreclosureDate\": \"2027-05-01\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/emi/foreclosure", "host": ["{{loanService}}"], "path": ["emi", "foreclosure"] }
+          }
+        },
+        {
+          "name": "GET /rates/preview — Interest Rate Preview",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{decisionService}}/rates/preview?productCode=PERSONAL_LOAN&tenureMonths=36&loanAmount=500000",
+              "host": ["{{decisionService}}"],
+              "path": ["rates", "preview"],
+              "query": [
+                { "key": "productCode", "value": "PERSONAL_LOAN" },
+                { "key": "tenureMonths", "value": "36" },
+                { "key": "loanAmount", "value": "500000" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. KYC Service",
+      "item": [
+        {
+          "name": "POST /kyc/consent — Capture Consent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"consentType\": \"KYC_VERIFICATION\"\n}"
+            },
+            "url": { "raw": "{{kycService}}/kyc/consent", "host": ["{{kycService}}"], "path": ["kyc", "consent"] }
+          }
+        },
+        {
+          "name": "POST /kyc/aadhaar/init — Aadhaar OTP Init",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('txnId returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.txnId || d.transactionId).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"aadhaarNumber\": \"{{aadhaarNumber}}\",\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{kycService}}/kyc/aadhaar/init", "host": ["{{kycService}}"], "path": ["kyc", "aadhaar", "init"] }
+          }
+        },
+        {
+          "name": "POST /kyc/aadhaar/verify — Aadhaar OTP Verify",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('kycId returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.kycId || d.status).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"txnId\": \"mock-txn-id\",\n  \"otp\": \"123456\",\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{kycService}}/kyc/aadhaar/verify", "host": ["{{kycService}}"], "path": ["kyc", "aadhaar", "verify"] }
+          }
+        },
+        {
+          "name": "POST /kyc/pan/verify — PAN Verification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('pan verified', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.status || d.isValid).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"panNumber\": \"{{panNumber}}\",\n  \"fullName\": \"Ravi Sharma\",\n  \"dob\": \"1990-04-21\",\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{kycService}}/kyc/pan/verify", "host": ["{{kycService}}"], "path": ["kyc", "pan", "verify"] }
+          }
+        },
+        {
+          "name": "POST /kyc/face/match — Face Match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('matchScore returned', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.matchScore || d.score).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"selfieImageBase64\": \"base64_encoded_image_data_here\"\n}"
+            },
+            "url": { "raw": "{{kycService}}/kyc/face/match", "host": ["{{kycService}}"], "path": ["kyc", "face", "match"] }
+          }
+        },
+        {
+          "name": "GET /kyc/:applicationId — Get KYC Record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{kycService}}/kyc/{{applicationId}}", "host": ["{{kycService}}"], "path": ["kyc", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "GET /kyc/consent/:applicationId — Get Consent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{kycService}}/kyc/consent/{{applicationId}}", "host": ["{{kycService}}"], "path": ["kyc", "consent", "{{applicationId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Document Service",
+      "item": [
+        {
+          "name": "POST /documents/presigned-url — Get Presigned URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('presigned URL', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.url || d.presignedUrl).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"documentType\": \"SALARY_SLIP\",\n  \"mimeType\": \"application/pdf\"\n}"
+            },
+            "url": { "raw": "{{documentService}}/documents/presigned-url", "host": ["{{documentService}}"], "path": ["documents", "presigned-url"] }
+          }
+        },
+        {
+          "name": "POST /documents/confirm-upload — Confirm Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('documentId', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  if (d.documentId) pm.collectionVariables.set('documentId', d.documentId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"uploadId\": \"upload-id-from-presigned-response\",\n  \"applicationId\": \"{{applicationId}}\",\n  \"documentType\": \"SALARY_SLIP\"\n}"
+            },
+            "url": { "raw": "{{documentService}}/documents/confirm-upload", "host": ["{{documentService}}"], "path": ["documents", "confirm-upload"] }
+          }
+        },
+        {
+          "name": "GET /applications/:id/documents — List Documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{documentService}}/applications/{{applicationId}}/documents", "host": ["{{documentService}}"], "path": ["applications", "{{applicationId}}", "documents"] }
+          }
+        },
+        {
+          "name": "POST /documents/:id/ocr — Trigger OCR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 202', () => {",
+                  "  pm.expect([200, 202]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{documentService}}/documents/{{documentId}}/ocr", "host": ["{{documentService}}"], "path": ["documents", "{{documentId}}", "ocr"] }
+          }
+        },
+        {
+          "name": "GET /documents/:id — Get Document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{documentService}}/documents/{{documentId}}", "host": ["{{documentService}}"], "path": ["documents", "{{documentId}}"] }
+          }
+        },
+        {
+          "name": "POST /documents/:id/review — Review Document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"APPROVED\",\n  \"remarks\": \"Salary slip verified, income matches application\"\n}"
+            },
+            "url": { "raw": "{{documentService}}/documents/{{documentId}}/review", "host": ["{{documentService}}"], "path": ["documents", "{{documentId}}", "review"] }
+          }
+        },
+        {
+          "name": "POST /documents/checklist — Generate Checklist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"loanType\": \"PERSONAL_LOAN\",\n  \"employmentType\": \"SALARIED_PRIVATE\"\n}"
+            },
+            "url": { "raw": "{{documentService}}/documents/checklist", "host": ["{{documentService}}"], "path": ["documents", "checklist"] }
+          }
+        },
+        {
+          "name": "GET /documents/stats — Document Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{documentService}}/documents/stats", "host": ["{{documentService}}"], "path": ["documents", "stats"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Integration Service — Bureau & Disbursement",
+      "item": [
+        {
+          "name": "POST /integration/bureau/consent — Bureau Consent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"panNumber\": \"{{panNumber}}\",\n  \"consentText\": \"I authorize bank to fetch my credit report\"\n}"
+            },
+            "url": { "raw": "{{integrationService}}/integration/bureau/consent", "host": ["{{integrationService}}"], "path": ["integration", "bureau", "consent"] }
+          }
+        },
+        {
+          "name": "POST /integration/bureau/pull — Pull Bureau Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 202', () => {",
+                  "  pm.expect([200, 202]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"consentOtp\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{integrationService}}/integration/bureau/pull", "host": ["{{integrationService}}"], "path": ["integration", "bureau", "pull"] }
+          }
+        },
+        {
+          "name": "GET /integration/bureau/reports — Get Bureau Reports",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('reports array', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.reports || d).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{integrationService}}/integration/bureau/reports?applicationId={{applicationId}}",
+              "host": ["{{integrationService}}"],
+              "path": ["integration", "bureau", "reports"],
+              "query": [{ "key": "applicationId", "value": "{{applicationId}}" }]
+            }
+          }
+        },
+        {
+          "name": "POST /integration/disbursement — Initiate Disbursement",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"amount\": 500000,\n  \"beneficiaryAccountNumber\": \"123456789012\",\n  \"beneficiaryIfsc\": \"SBIN0001234\",\n  \"beneficiaryName\": \"Ravi Sharma\",\n  \"mode\": \"IMPS\"\n}"
+            },
+            "url": { "raw": "{{integrationService}}/integration/disbursement", "host": ["{{integrationService}}"], "path": ["integration", "disbursement"] }
+          }
+        },
+        {
+          "name": "GET /integration/disbursement — List Disbursements",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{integrationService}}/integration/disbursement?applicationId={{applicationId}}",
+              "host": ["{{integrationService}}"],
+              "path": ["integration", "disbursement"],
+              "query": [{ "key": "applicationId", "value": "{{applicationId}}" }]
+            }
+          }
+        },
+        {
+          "name": "POST /integration/nach/mandate — Register NACH Mandate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"accountNumber\": \"123456789012\",\n  \"ifsc\": \"SBIN0001234\",\n  \"accountHolderName\": \"Ravi Sharma\",\n  \"emandateAmount\": 16000,\n  \"frequency\": \"MONTHLY\"\n}"
+            },
+            "url": { "raw": "{{integrationService}}/integration/nach/mandate", "host": ["{{integrationService}}"], "path": ["integration", "nach", "mandate"] }
+          }
+        },
+        {
+          "name": "POST /integration/penny-drop/verify — Penny Drop Verify",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountNumber\": \"123456789012\",\n  \"ifsc\": \"SBIN0001234\",\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{integrationService}}/integration/penny-drop/verify", "host": ["{{integrationService}}"], "path": ["integration", "penny-drop", "verify"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Decision Engine",
+      "item": [
+        {
+          "name": "POST /decisions/trigger — Trigger Decision",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 202', () => {",
+                  "  pm.expect([200, 202]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{decisionService}}/decisions/trigger", "host": ["{{decisionService}}"], "path": ["decisions", "trigger"] }
+          }
+        },
+        {
+          "name": "GET /decisions/:applicationId — Get Decision",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('decision result', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.decision || d.status || d.decisionType).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{decisionService}}/decisions/{{applicationId}}", "host": ["{{decisionService}}"], "path": ["decisions", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "POST /decisions/override — Manual Override",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"decision\": \"APPROVED\",\n  \"overrideReason\": \"Exception approved: FOIR slightly above threshold but income growth trajectory is strong\"\n}"
+            },
+            "url": { "raw": "{{decisionService}}/decisions/override", "host": ["{{decisionService}}"], "path": ["decisions", "override"] }
+          }
+        },
+        {
+          "name": "GET /rules — List Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('rules array', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.rules || d).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{decisionService}}/rules", "host": ["{{decisionService}}"], "path": ["rules"] }
+          }
+        },
+        {
+          "name": "POST /rules/evaluate-context — Evaluate Rule Context",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"context\": {\n    \"cibilScore\": 745,\n    \"foir\": 45,\n    \"loanAmount\": 500000,\n    \"employmentType\": \"SALARIED_PRIVATE\"\n  }\n}"
+            },
+            "url": { "raw": "{{decisionService}}/rules/evaluate-context", "host": ["{{decisionService}}"], "path": ["rules", "evaluate-context"] }
+          }
+        },
+        {
+          "name": "GET /ml/models — List ML Models",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{decisionService}}/ml/models", "host": ["{{decisionService}}"], "path": ["ml", "models"] }
+          }
+        },
+        {
+          "name": "GET /policy/versions — Policy Versions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{decisionService}}/policy/versions", "host": ["{{decisionService}}"], "path": ["policy", "versions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Loan Service — Sanction Letter & Agreement",
+      "item": [
+        {
+          "name": "GET /sanction-letter/:id/preview — Preview Sanction Letter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('sanctionedAmount', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.sanctionedAmount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/sanction-letter/{{applicationId}}/preview", "host": ["{{loanService}}"], "path": ["sanction-letter", "{{applicationId}}", "preview"] }
+          }
+        },
+        {
+          "name": "GET /sanction-letter/:id/pdf — Download Sanction Letter",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('PDF content-type', () => pm.expect(pm.response.headers.get('content-type')).to.include('pdf'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/sanction-letter/{{applicationId}}/pdf", "host": ["{{loanService}}"], "path": ["sanction-letter", "{{applicationId}}", "pdf"] }
+          }
+        },
+        {
+          "name": "POST /loan-agreement/generate — Generate Agreement",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('agreementId', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  if (d.id) pm.collectionVariables.set('agreementId', d.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/loan-agreement/generate", "host": ["{{loanService}}"], "path": ["loan-agreement", "generate"] }
+          }
+        },
+        {
+          "name": "GET /loan-agreement/application/:id — Get Agreement",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/loan-agreement/application/{{applicationId}}", "host": ["{{loanService}}"], "path": ["loan-agreement", "application", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "POST /loan-agreement/esign/initiate — Initiate eSign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});",
+                  "pm.test('esignTransactionId', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  if (d.esignTransactionId) pm.collectionVariables.set('esignTransactionId', d.esignTransactionId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"signerName\": \"Ravi Sharma\",\n  \"signerMobile\": \"9876543210\",\n  \"signerEmail\": \"ravi.sharma@example.com\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/loan-agreement/esign/initiate", "host": ["{{loanService}}"], "path": ["loan-agreement", "esign", "initiate"] }
+          }
+        },
+        {
+          "name": "POST /loan-agreement/esign/verify — Verify eSign OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{esignTransactionId}}\",\n  \"otp\": \"123456\",\n  \"aadhaarLast4\": \"3456\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/loan-agreement/esign/verify", "host": ["{{loanService}}"], "path": ["loan-agreement", "esign", "verify"] }
+          }
+        },
+        {
+          "name": "POST /loan-agreement/esign/cancel — Cancel eSign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{esignTransactionId}}\",\n  \"reason\": \"Customer requested cancellation\"\n}"
+            },
+            "url": { "raw": "{{loanService}}/loan-agreement/esign/cancel", "host": ["{{loanService}}"], "path": ["loan-agreement", "esign", "cancel"] }
+          }
+        },
+        {
+          "name": "GET /loan-agreement/signatures/:agreementId — Get Signatures",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/loan-agreement/signatures/{{agreementId}}", "host": ["{{loanService}}"], "path": ["loan-agreement", "signatures", "{{agreementId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Loan Service — PDD",
+      "item": [
+        {
+          "name": "POST /pdd/:applicationId/initiate — Initiate PDD",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/pdd/{{applicationId}}/initiate", "host": ["{{loanService}}"], "path": ["pdd", "{{applicationId}}", "initiate"] }
+          }
+        },
+        {
+          "name": "GET /pdd/:applicationId — Get PDD Checklist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/pdd/{{applicationId}}", "host": ["{{loanService}}"], "path": ["pdd", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "GET /pdd/dashboard/summary — PDD Dashboard Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/pdd/dashboard/summary", "host": ["{{loanService}}"], "path": ["pdd", "dashboard", "summary"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Notification Service",
+      "item": [
+        {
+          "name": "POST /notifications/send — Send Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 202', () => {",
+                  "  pm.expect([200, 202]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"SMS\",\n  \"recipientId\": \"{{applicationId}}\",\n  \"templateName\": \"LOAN_SUBMITTED\",\n  \"variables\": {\n    \"applicationNumber\": \"{{applicationNumber}}\",\n    \"customerName\": \"Ravi Sharma\"\n  },\n  \"applicationId\": \"{{applicationId}}\"\n}"
+            },
+            "url": { "raw": "{{notificationService}}/notifications/send", "host": ["{{notificationService}}"], "path": ["notifications", "send"] }
+          }
+        },
+        {
+          "name": "GET /notifications/history — Get Notification History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{notificationService}}/notifications/history?applicationId={{applicationId}}&page=0&limit=20",
+              "host": ["{{notificationService}}"],
+              "path": ["notifications", "history"],
+              "query": [
+                { "key": "applicationId", "value": "{{applicationId}}" },
+                { "key": "page", "value": "0" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /notifications/otp/send — Send OTP via Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"purpose\": \"LOGIN\",\n  \"channel\": \"SMS\"\n}"
+            },
+            "url": { "raw": "{{notificationService}}/notifications/otp/send", "host": ["{{notificationService}}"], "path": ["notifications", "otp", "send"] }
+          }
+        },
+        {
+          "name": "GET /notifications/templates — List Templates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{notificationService}}/notifications/templates", "host": ["{{notificationService}}"], "path": ["notifications", "templates"] }
+          }
+        },
+        {
+          "name": "GET /notifications/stats — Notification Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{notificationService}}/notifications/stats", "host": ["{{notificationService}}"], "path": ["notifications", "stats"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Audit Logs",
+      "item": [
+        {
+          "name": "GET /audit-logs — Query Audit Logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('data array', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.data || d).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{loanService}}/audit-logs?category=KYC&dateRange=7d&page=0&size=50",
+              "host": ["{{loanService}}"],
+              "path": ["audit-logs"],
+              "query": [
+                { "key": "category", "value": "KYC" },
+                { "key": "dateRange", "value": "7d" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /audit-logs/export — Export Audit Logs CSV",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('csv present', () => {",
+                  "  const d = pm.response.json();",
+                  "  pm.expect(d.csv).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": {
+              "raw": "{{loanService}}/audit-logs/export?category=DECISION&dateRange=30d",
+              "host": ["{{loanService}}"],
+              "path": ["audit-logs", "export"],
+              "query": [
+                { "key": "category", "value": "DECISION" },
+                { "key": "dateRange", "value": "30d" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. DSA Service",
+      "item": [
+        {
+          "name": "POST /auth/register — DSA Partner Registration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"ABC Financial Services Pvt Ltd\",\n  \"contactPerson\": \"Vikram Patel\",\n  \"mobile\": \"9876543211\",\n  \"email\": \"vikram@abcfinserv.com\",\n  \"pan\": \"AABCA1234B\",\n  \"gstin\": \"27AABCA1234B1ZA\",\n  \"address\": {\n    \"line1\": \"101, Business Hub\",\n    \"city\": \"Mumbai\",\n    \"state\": \"MH\",\n    \"pincode\": \"400001\"\n  },\n  \"bankAccount\": {\n    \"accountNumber\": \"9876543210987\",\n    \"ifsc\": \"HDFC0000001\",\n    \"accountHolderName\": \"ABC Financial Services\"\n  }\n}"
+            },
+            "url": { "raw": "{{dsaService}}/auth/register", "host": ["{{dsaService}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "POST /auth/login — DSA Partner Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('accessToken received', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  if (d.accessToken) pm.collectionVariables.set('dsaToken', d.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partnerCode\": \"ABC001\",\n  \"password\": \"DSA@Pass123!\"\n}"
+            },
+            "url": { "raw": "{{dsaService}}/auth/login", "host": ["{{dsaService}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "POST /auth/refresh — DSA Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('new token', () => {",
+                  "  const d = pm.response.json().data || pm.response.json();",
+                  "  pm.expect(d.accessToken).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"your-refresh-token-here\"\n}"
+            },
+            "url": { "raw": "{{dsaService}}/auth/refresh", "host": ["{{dsaService}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "GET /dashboard — DSA Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": { "raw": "{{dsaService}}/dashboard", "host": ["{{dsaService}}"], "path": ["dashboard"] }
+          }
+        },
+        {
+          "name": "POST /applications — DSA Create Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', () => {",
+                  "  pm.expect([200, 201]).to.include(pm.response.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{dsaToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanType\": \"PERSONAL_LOAN\",\n  \"channelCode\": \"DSA_REFERRAL\",\n  \"branchCode\": \"MH001\",\n  \"applicant\": {\n    \"fullName\": \"Priya Verma\",\n    \"dob\": \"1992-08-15\",\n    \"gender\": \"FEMALE\",\n    \"maritalStatus\": \"MARRIED\",\n    \"mobile\": \"9876543212\",\n    \"email\": \"priya.verma@example.com\",\n    \"residentialStatus\": \"RESIDENT_INDIAN\"\n  },\n  \"employmentDetails\": {\n    \"employmentType\": \"SALARIED_PRIVATE\",\n    \"employerName\": \"Wipro Technologies\",\n    \"designation\": \"Project Lead\",\n    \"totalWorkExperienceMonths\": 96,\n    \"currentJobExperienceMonths\": 36,\n    \"grossMonthlyIncome\": 180000,\n    \"netMonthlyIncome\": 140000,\n    \"totalAnnualIncome\": 2160000\n  },\n  \"loanRequirement\": {\n    \"loanType\": \"PERSONAL_LOAN\",\n    \"requestedAmount\": 750000,\n    \"requestedTenureMonths\": 48,\n    \"purposeDescription\": \"Home renovation\"\n  }\n}"
+            },
+            "url": { "raw": "{{dsaService}}/applications", "host": ["{{dsaService}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "GET /applications — DSA List Applications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": {
+              "raw": "{{dsaService}}/applications?page=0&limit=20",
+              "host": ["{{dsaService}}"],
+              "path": ["applications"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /officers — DSA List Officers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": { "raw": "{{dsaService}}/officers", "host": ["{{dsaService}}"], "path": ["officers"] }
+          }
+        },
+        {
+          "name": "GET /commissions — DSA Commissions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": { "raw": "{{dsaService}}/commissions", "host": ["{{dsaService}}"], "path": ["commissions"] }
+          }
+        },
+        {
+          "name": "GET /commissions/history — DSA Commission History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": {
+              "raw": "{{dsaService}}/commissions/history?page=0&limit=50",
+              "host": ["{{dsaService}}"],
+              "path": ["commissions", "history"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /profile — DSA Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{dsaToken}}" }],
+            "url": { "raw": "{{dsaService}}/profile", "host": ["{{dsaService}}"], "path": ["profile"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Error & Edge Cases",
+      "item": [
+        {
+          "name": "401 Unauthorized",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer invalid_token" }],
+            "url": { "raw": "{{loanService}}/applications", "host": ["{{loanService}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "404 Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{loanService}}/applications/00000000-0000-0000-0000-000000000000", "host": ["{{loanService}}"], "path": ["applications", "00000000-0000-0000-0000-000000000000"] }
+          }
+        },
+        {
+          "name": "409 Duplicate Application",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanType\": \"PERSONAL_LOAN\",\n  \"channelCode\": \"MOBILE_APP\",\n  \"applicant\": {\n    \"fullName\": \"Ravi Sharma\",\n    \"dob\": \"1990-04-21\",\n    \"mobile\": \"9876543210\",\n    \"residentialStatus\": \"RESIDENT_INDIAN\"\n  },\n  \"employmentDetails\": {\n    \"employmentType\": \"SALARIED_PRIVATE\",\n    \"grossMonthlyIncome\": 120000,\n    \"netMonthlyIncome\": 95000,\n    \"totalAnnualIncome\": 1440000\n  },\n  \"loanRequirement\": {\n    \"loanType\": \"PERSONAL_LOAN\",\n    \"requestedAmount\": 500000,\n    \"requestedTenureMonths\": 36\n  }\n}"
+            },
+            "url": { "raw": "{{loanService}}/applications", "host": ["{{loanService}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "400 Validation Error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"loanType\": \"\",\n  \"applicant\": {\n    \"mobile\": \"invalid\"\n  }\n}"
+            },
+            "url": { "raw": "{{loanService}}/applications", "host": ["{{loanService}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "429 Rate Limited",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 429', () => pm.response.to.have.status(429));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"9876543210\",\n  \"purpose\": \"LOGIN\",\n  \"channel\": \"SMS\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/otp/send", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "send"] }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  }
+}

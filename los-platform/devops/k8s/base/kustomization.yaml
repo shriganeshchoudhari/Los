@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: los-platform
+
+commonLabels:
+  app: los
+  managed-by: kustomize
+
+resources:
+  - common.yaml
+  - auth-service.yaml
+  - loan-service.yaml
+  - kyc-service.yaml
+  - decision-engine.yaml
+  - integration-service.yaml
+  - notification-service.yaml
+  - dsa-service.yaml
+  - document-service.yaml
+  - frontend.yaml
+  - prometheus-rules/los-alerts.yaml
+  - prometheus-rules/los-slos.yaml
+  - grafana-datasources/datasources.yaml
+  - promtail-config.yaml
+
+configMapGenerator:
+  - name: los-config
+    literals:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+
+vars:
+  - name: ECR_REGISTRY
+    objref:
+      kind: ConfigMap
+      name: los-config
+      apiVersion: v1
+      fieldPath: data.ECR_REGISTRY

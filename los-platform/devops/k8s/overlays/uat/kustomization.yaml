@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: los-platform-uat
+
+resources:
+  - ../../base
+
+images:
+  - name: ${ECR_REGISTRY}/auth-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/loan-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/kyc-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/decision-engine
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/integration-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/notification-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/dsa-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/document-service
+    newTag: uat-latest
+  - name: ${ECR_REGISTRY}/frontend
+    newTag: uat-latest
+
+configMapGenerator:
+  - name: los-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=uat
+
+patchesStrategicMerge:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment

@@ -1,0 +1,22 @@
+# Next.js
+.next/
+out/
+build/
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Test
+coverage/
+playwright-report/
+
+# IDE
+.vscode/
+.idea/

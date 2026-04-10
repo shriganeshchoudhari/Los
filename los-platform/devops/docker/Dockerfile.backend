@@ -1,0 +1,35 @@
+ARG SERVICE_NAME=auth-service
+
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./services/${SERVICE_NAME}/
+COPY tsconfig.json ./services/${SERVICE_NAME}/
+
+COPY common/package*.json ./services/common/
+COPY common/tsconfig.json ./services/common/
+COPY common/src ./services/common/src
+
+WORKDIR /app/services/${SERVICE_NAME}
+RUN npm ci --only=production --prefix ../common && npm ci && npm run build
+
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001
+
+COPY --from=builder --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/services/common ./common
+COPY --from=builder --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/package*.json ./
+
+USER nestjs
+
+EXPOSE ${PORT:-3000}
+
+ENV NODE_ENV=production
+
+CMD ["node", "dist/main"]

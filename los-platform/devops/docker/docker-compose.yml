@@ -1,0 +1,378 @@
+version: '3.8'
+
+x-opts-backend-base: &opts-backend-base
+  depends_on:
+    init-migrations:
+      condition: service_completed_successfully
+  restart: unless-stopped
+  networks:
+    - los-network
+
+x-env-common: &env-common
+  NODE_ENV: development
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  KAFKA_BROKERS: kafka:9092
+  CORS_ORIGINS: "*"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4318}
+  OTEL_TRACES_SAMPLER: parentbased_always_on
+  OTEL_PROPAGATORS: b3,tracecontext
+  NODE_OPTIONS: "-r @opentelemetry/auto-instrumentations-node/register"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: los_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-los_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U los_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - los-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - los-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+    networks:
+      - los-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - los-network
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - los-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - los-network
+
+  # ── Init: Create all 9 databases ─────────────────────────────────────────────
+  init-databases:
+    image: postgres:15-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./database/init-databases.sql:/init-databases.sql:ro
+    entrypoint: ["psql", "-h", "postgres", "-U", "los_user", "-f", "/init-databases.sql"]
+    networks:
+      - los-network
+
+  # ── Init: Run all service migrations ─────────────────────────────────────────
+  init-migrations:
+    image: alpine:3.19
+    depends_on:
+      init-databases:
+        condition: service_completed_successfully
+    volumes:
+      - ./database/migrations:/migrations:ro
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      MIGRATIONS_DIR: /migrations
+    entrypoint: ["/bin/sh", "/migrations/migration-runner.sh"]
+    networks:
+      - los-network
+
+  # ── Auth Service (port 3001) ──────────────────────────────────────────────────
+  auth-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: auth-service
+    SERVICE_NAME: auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      <<: *env-common
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_auth
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production}
+      LDAP_URL: ${LDAP_URL:-ldap://localhost:389}
+      LDAP_BASE_DN: ${LDAP_BASE_DN:-dc=bank,dc=internal}
+      OTEL_SERVICE_NAME: auth-service
+
+  # ── KYC Service (port 3002) ──────────────────────────────────────────────────
+  kyc-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: kyc-service
+    SERVICE_NAME: kyc-service
+    ports:
+      - "3002:3002"
+    environment:
+      <<: *env-common
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_kyc
+      UIDAI_LICENSE_KEY: ${UIDAI_LICENSE_KEY:-}
+      DIGILOCKER_CLIENT_ID: ${DIGILOCKER_CLIENT_ID:-}
+      DIGILOCKER_CLIENT_SECRET: ${DIGILOCKER_CLIENT_SECRET:-}
+      OTEL_SERVICE_NAME: kyc-service
+
+  # ── Loan Service (port 3003) ─────────────────────────────────────────────────
+  loan-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: loan-service
+    SERVICE_NAME: loan-service
+    ports:
+      - "3003:3003"
+    environment:
+      <<: *env-common
+      PORT: 3003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_loan
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: los-documents
+      OTEL_SERVICE_NAME: loan-service
+
+  # ── Decision Engine (port 3004) ───────────────────────────────────────────────
+  decision-engine:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: decision-engine
+    SERVICE_NAME: decision-engine
+    ports:
+      - "3004:3004"
+    environment:
+      <<: *env-common
+      PORT: 3004
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_decision
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production}
+      LOAN_SERVICE_URL: ${LOAN_SERVICE_URL:-http://loan-service:3003}
+      KYC_SERVICE_URL: ${KYC_SERVICE_URL:-http://kyc-service:3002}
+      INTEGRATION_SERVICE_URL: ${INTEGRATION_SERVICE_URL:-http://integration-service:3006}
+      OTEL_SERVICE_NAME: decision-engine
+
+  # ── Integration Service (port 3006) ───────────────────────────────────────────
+  integration-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: integration-service
+    SERVICE_NAME: integration-service
+    ports:
+      - "3006:3006"
+    environment:
+      <<: *env-common
+      PORT: 3006
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_integration
+      CBS_BASE_URL: ${CBS_BASE_URL:-http://localhost:8080}
+      BUREAU_CIBIL_API_KEY: ${BUREAU_CIBIL_API_KEY:-}
+      BUREAU_EXPERIAN_API_KEY: ${BUREAU_EXPERIAN_API_KEY:-}
+      BUREAU_EQUIFAX_API_KEY: ${BUREAU_EQUIFAX_API_KEY:-}
+      BUREAU_CRIF_API_KEY: ${BUREAU_CRIF_API_KEY:-}
+      NPCI_BASE_URL: ${NPCI_BASE_URL:-http://localhost:8081}
+      OTEL_SERVICE_NAME: integration-service
+
+  # ── Notification Service (port 3007) ─────────────────────────────────────────
+  notification-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: notification-service
+    SERVICE_NAME: notification-service
+    ports:
+      - "3007:3007"
+    environment:
+      <<: *env-common
+      PORT: 3007
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_notification
+      SMS_PROVIDER_API_KEY: ${SMS_API_KEY:-}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-LOSBNK}
+      EMAIL_PROVIDER_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@losbank.in}
+      WHATSAPP_PROVIDER_API_KEY: ${WHATSAPP_API_KEY:-}
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+      OTEL_SERVICE_NAME: notification-service
+
+  # ── DSA Service (port 3008) ──────────────────────────────────────────────────
+  dsa-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: dsa-service
+    SERVICE_NAME: dsa-service
+    ports:
+      - "3008:3008"
+    environment:
+      <<: *env-common
+      PORT: 3008
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_dsa
+      DSA_JWT_SECRET: ${DSA_JWT_SECRET:-dev_dsa_secret_change_in_production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_32_chars_long}
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001"
+      OTEL_SERVICE_NAME: dsa-service
+
+  # ── Document Service (port 3009) ─────────────────────────────────────────────
+  document-service:
+    <<: *opts-backend-base
+    build:
+      context: ../backend
+      dockerfile: devops/docker/Dockerfile.backend
+      args:
+        SERVICE_NAME: document-service
+    SERVICE_NAME: document-service
+    ports:
+      - "3009:3009"
+    environment:
+      <<: *env-common
+      PORT: 3009
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: los_user
+      DB_PASSWORD: ${DB_PASSWORD:-los_password}
+      DB_NAME: los_document
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: los-documents
+      KARZA_API_KEY: ${KARZA_API_KEY:-}
+      SIGNZY_API_KEY: ${SIGNZY_API_KEY:-}
+      OTEL_SERVICE_NAME: document-service
+
+  # ── Frontend (port 3000) ──────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../devops/docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://auth-service:3001
+      NEXT_PUBLIC_DSA_API_BASE_URL: http://dsa-service:3008
+    depends_on:
+      auth-service:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - los-network
+
+networks:
+  los-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

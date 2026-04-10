@@ -1,0 +1,58 @@
+{
+  "name": "los-backend",
+  "version": "1.0.0",
+  "description": "LOS Platform - Loan Origination System Backend",
+  "private": true,
+  "workspaces": [
+    "common",
+    "auth-service",
+    "kyc-service",
+    "loan-service",
+    "decision-engine",
+    "integration-service",
+    "notification-service",
+    "dsa-service",
+    "document-service"
+  ],
+  "scripts": {
+    "build": "nx run-many --target=build --all",
+    "build:prod": "nx run-many --target=build --all --configuration=production",
+    "test": "nx run-many --target=test --all",
+    "test:cov": "nx run-many --target=test --all --coverage",
+    "test:e2e": "jest --config test/jest-e2e.json --passWithNoTests",
+    "test:e2e:auth": "jest --config test/jest-e2e.json --testPathPattern=auth.e2e-spec --passWithNoTests",
+    "test:e2e:loan": "jest --config test/jest-e2e.json --testPathPattern=loan-lifecycle.e2e-spec --passWithNoTests",
+    "test:e2e:kyc": "jest --config test/jest-e2e.json --testPathPattern=kyc-bureau.e2e-spec --passWithNoTests",
+    "test:e2e:dsa": "jest --config test/jest-e2e.json --testPathPattern=dsa.e2e-spec --passWithNoTests",
+    "test:e2e:document": "jest --config test/jest-e2e.json --testPathPattern=document.e2e-spec --passWithNoTests",
+    "lint": "nx run-many --target=lint --all",
+    "typecheck": "nx run-many --target=typecheck --all",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "migrate": "ts-node scripts/migrate.ts",
+    "seed": "ts-node scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.3.0",
+    "@nestjs/schematics": "^10.1.0",
+    "@nestjs/testing": "^10.3.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^20.10.0",
+    "@types/supertest": "^6.0.2",
+    "@types/uuid": "^9.0.0",
+    "bcrypt": "^5.1.1",
+    "jest": "^29.7.0",
+    "nx": "^18.0.0",
+    "supertest": "^6.3.4",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typeorm": "^0.3.19",
+    "typescript": "^5.3.0",
+    "uuid": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

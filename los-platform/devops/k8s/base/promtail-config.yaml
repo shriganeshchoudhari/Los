@@ -1,0 +1,98 @@
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+positions:
+  filename: /var/log/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: los-platform
+
+limits:
+  readline_rate: 1.0
+  readline_burst: 10
+  readline_rate_enabled: false
+
+scrape_configs:
+
+  - job_name: los-platform
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - los-platform-dev
+            - los-platform-uat
+            - los-platform-prod
+      - role: node
+    relabel_configs:
+      - action: drop
+        source_labels: [__meta_kubernetes_pod_container_name]
+        regex: "prometheus|istio-proxy|opensearch|telegraf"
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: service
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+        target_label: instance
+      - action: replace
+        source_labels: [__meta_kubernetes_namespace]
+        target_label: env
+        regex: los-platform-(.+)
+        replacement: "${1}"
+      - action: replace
+        source_labels: [__meta_kubernetes_node_name]
+        target_label: node
+        regex: "(.+)"
+        replacement: "${1}"
+
+  - job_name: los-ingress-nginx
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - los-platform-dev
+            - los-platform-uat
+            - los-platform-prod
+    relabel_configs:
+      - action: keep
+        source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: "nginx-ingress"
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - action: replace
+        source_labels: [__meta_kubernetes_namespace]
+        target_label: env
+        regex: los-platform-(.+)
+        replacement: "${1}"
+
+  - job_name: los-system-components
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - kube-system
+            - los-platform-dev
+            - los-platform-uat
+            - los-platform-prod
+    relabel_configs:
+      - action: keep
+        source_labels: [__meta_kubernetes_pod_container_name]
+        regex: "istio-proxy"
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - action: replace
+        regex: "(.+)/.+"
+        replacement: "${1}"
+        source_labels: [__meta_kubernetes_pod_name]
+        target_label: workload_name
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)

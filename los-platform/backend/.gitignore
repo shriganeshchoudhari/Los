@@ -1,0 +1,19 @@
+# NestJS
+dist/
+build/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+coverage/
+*.tsbuildinfo
+.nx/
+
+# Test
+test-results/
+playwright-report/
+*.spec.js
+
+# Env
+.env
+.env.local
+.env.*.local

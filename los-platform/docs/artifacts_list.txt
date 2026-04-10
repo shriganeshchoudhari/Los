@@ -1,0 +1,218 @@
+LOAN ORIGINATION SYSTEM (LOS) — ARTIFACTS LIST
+Indian Banking Context | Production-Grade
+Generated: 2024-07-15
+=======================================================
+
+SECTION 1: DOCUMENTATION ARTIFACTS
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+DOC-001   PRD.md                             Product Requirements Document — problem statement,    COMPLETE
+                                             personas, user journeys, functional/non-functional
+                                             requirements, regulatory compliance, KPIs, roadmap.
+
+DOC-002   TTD.md                             Technical Design Document — system architecture,      COMPLETE
+                                             microservice TDD, integration patterns, data layer,
+                                             security architecture, observability stack.
+
+DOC-003   API_documentation.md              Full REST API specification — all endpoints across     COMPLETE
+                                             Auth, Application, KYC, Document, Bureau, Decision,
+                                             Loan services. Includes SOAP CBS reference.
+
+DOC-004   Database_schema_doc.md            PostgreSQL schema — all 22 table definitions,          COMPLETE
+                                             indexes, partitioning strategy, RLS policies,
+                                             encryption approach, retention policy.
+
+DOC-005   security_compliance_doc.md        Security architecture — zero trust, JWT/RBAC,          COMPLETE
+                                             encryption, UIDAI compliance, RBI guidelines,
+                                             fraud detection, audit trail, incident response.
+
+DOC-006   deployment_operation_manual.md    DevOps manual — Dockerfiles, Kubernetes manifests,     COMPLETE
+                                             CI/CD pipelines, ArgoCD GitOps, alerting rules,
+                                             DR runbooks, capacity planning.
+
+DOC-007   UI_UX_design_specification.md     Design system — color tokens, typography, spacing,     COMPLETE
+                                             screen-by-screen specs, responsive breakpoints,
+                                             accessibility (WCAG 2.1 AA), animations.
+
+DOC-008   task.md                           Implementation task tracker — 912 tasks across 7       COMPLETE
+                                             phases, priorities, estimates, owners, blockers.
+
+DOC-009   artifacts_list.txt               This file — full inventory of all system artifacts.     COMPLETE
+
+
+SECTION 2: TESTING ARTIFACTS
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+TEST-001  Test_plan_and_test_cases.md        Test strategy, coverage targets, unit/integration/    COMPLETE
+                                             performance/security test cases, test data
+                                             management, environment matrix.
+
+TEST-002  API_test_cases.md                 Jest/Supertest API test cases — Auth, Application,    COMPLETE
+                                             KYC, Bureau, Decision, Disbursement, Fraud
+                                             scenarios, edge cases with full TypeScript code.
+
+TEST-003  E2E_automation_setup_guide.md     Playwright framework setup — project structure,        COMPLETE
+                                             playwright.config.ts, Page Object Models,
+                                             fixtures, CI/CD integration, debugging guide.
+
+TEST-004  E2E_automation_test_cases.md      10 Playwright E2E test specs — STP full flow,         COMPLETE
+                                             KYC failure, document upload, rejection path,
+                                             officer worklist, maker-checker sanction,
+                                             mobile responsive, consent, notifications,
+                                             accessibility (axe-core).
+
+
+SECTION 3: TYPE DEFINITIONS
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+TYPES-001 los-types.ts                       Comprehensive TypeScript type definitions —           COMPLETE
+                                             16 sections covering: shared primitives, user/auth,
+                                             KYC (Aadhaar+PAN), documents, loan application,
+                                             credit bureau, decision engine, loan, CBS SOAP,
+                                             payments, notifications, audit, Kafka events,
+                                             API contracts, error catalogue, configuration.
+                                             ~1200 lines, production-ready.
+
+
+SECTION 4: CODE ARTIFACTS (To be created during implementation)
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+CODE-001  services/auth-service/             NestJS Auth Service                                  TODO (M1)
+CODE-002  services/application-service/      NestJS Application Service                           TODO (M1)
+CODE-003  services/kyc-service/              NestJS KYC Service                                   TODO (M2)
+CODE-004  services/document-service/         NestJS Document Service                              TODO (M2)
+CODE-005  services/integration-service/      NestJS Integration Service (UIDAI/CBS/NPCI)          TODO (M2)
+CODE-006  services/decision-engine/          NestJS Decision Engine + Rule Engine                 TODO (M3)
+CODE-007  services/notification-service/     NestJS Notification Service (SMS/Email/WA)           TODO (M3)
+CODE-008  services/loan-service/             NestJS Loan + Disbursement Service                   TODO (M4)
+CODE-009  frontend/applicant-portal/         Next.js 14 Applicant Web Portal                     TODO (M1-M7)
+CODE-010  frontend/officer-portal/           Next.js 14 Officer/Manager Portal                   TODO (M3-M7)
+CODE-011  frontend/dsa-portal/               Next.js 14 DSA Partner Portal                       TODO (M5-M8)
+CODE-012  migrations/                        TypeORM database migrations                          TODO (M1)
+CODE-013  shared/types/                      Shared TypeScript types (from los-types.ts)          TODO (M1)
+CODE-014  shared/kafka/                      Kafka client module (KafkaJS)                        TODO (M1)
+CODE-015  shared/vault/                      Vault client module                                  TODO (M1)
+
+
+SECTION 5: INFRASTRUCTURE ARTIFACTS (To be created)
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+INFRA-001 infrastructure/terraform/          Terraform modules — VPC, EKS, RDS, ElastiCache,      TODO (M0)
+                                             MSK Kafka, S3/MinIO, WAF, KMS, IAM roles
+INFRA-002 k8s/base/                          Base Kubernetes manifests — namespaces, quotas,       TODO (M0)
+                                             network policies, RBAC
+INFRA-003 k8s/overlays/                      Kustomize overlays per environment (dev/uat/prod)     TODO (M0)
+INFRA-004 k8s/services/                      Service-specific deployments, HPA, services           TODO (M1)
+INFRA-005 k8s/monitoring/                    Prometheus rules, Grafana dashboards, alert rules     TODO (M0)
+INFRA-006 k8s/istio/                         Istio VirtualService, DestinationRule, PeerAuth       TODO (M0)
+INFRA-007 .github/workflows/                 GitHub Actions CI/CD workflows per service            TODO (M0)
+INFRA-008 argocd/                            ArgoCD Application manifests per environment          TODO (M0)
+INFRA-009 kong/declarative/kong.yml          Kong API Gateway declarative configuration            TODO (M0)
+INFRA-010 vault/policies/                    Vault policies per service                            TODO (M0)
+
+
+SECTION 6: REGULATORY / COMPLIANCE ARTIFACTS (To be created)
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+COMP-001  compliance/uidai-aua-license/      UIDAI AUA license application documents              IN PROGRESS
+COMP-002  compliance/rbi-submission/         RBI Digital Lending compliance checklist             TODO (M8)
+COMP-003  compliance/ckycr-integration/      CKYCR API integration spec + test evidence           TODO (M6)
+COMP-004  compliance/dlt-templates/          TRAI DLT registered SMS template list                TODO (M3)
+COMP-005  compliance/vapt-report/            CERT-In VAPT report + remediation tracker            TODO (M6)
+COMP-006  compliance/data-flow-diagram/      Data flow diagram (for RBI submission)               TODO (M5)
+COMP-007  compliance/privacy-notice/         Privacy notice / data processing agreement           TODO (M4)
+COMP-008  compliance/consent-templates/      Consent text versions (v1.0, v2.0...)                TODO (M2)
+
+
+SECTION 7: INTEGRATION CREDENTIALS / CONFIG (To be procured)
+------------------------------------------------------
+
+ID        INTEGRATION          CREDENTIAL TYPE          STATUS
+------------------------------------------------------
+CRED-001  UIDAI Aadhaar eKYC   AUA License + API keys   IN PROGRESS (6-8 week process)
+CRED-002  CIBIL TransUnion     Commercial API key        PENDING (procurement)
+CRED-003  Experian India       Commercial API key        PENDING (procurement)
+CRED-004  Equifax India        Commercial API key        PENDING (procurement)
+CRED-005  CRIF High Mark       Commercial API key        PENDING (procurement)
+CRED-006  NPCI IMPS            SOR + API credentials     PENDING (NPCI registration)
+CRED-007  NPCI NACH            SOR + API credentials     PENDING (NPCI registration)
+CRED-008  CBS Finacle          WSDL + test env access    PENDING (internal IT)
+CRED-009  Kaleyra (SMS)        API key + DLT header      PENDING (commercial)
+CRED-010  Gupshup (WhatsApp)   API key + WhatsApp BSP    PENDING (commercial)
+CRED-011  SendGrid (Email)     API key                   PENDING (commercial)
+CRED-012  NSDL PAN API         Subscriber key            PENDING (NSDL registration)
+CRED-013  DigiLocker           Client ID + secret        PENDING (MeitY registration)
+CRED-014  CKYCR                Unique Institution ID     PENDING (KRA registration)
+
+
+SECTION 8: TEST DATA FIXTURES
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+FIX-001   fixtures/uidai_kyc_success.xml    Valid UIDAI signed XML response (sandbox)            TODO (M2)
+FIX-002   fixtures/uidai_otp_expired.json   UIDAI error code 201 response                       TODO (M2)
+FIX-003   fixtures/cibil_750_clean.json     CIBIL score 750, 0 DPD, clean history               TODO (M3)
+FIX-004   fixtures/cibil_620_dpd.json       CIBIL score 620, multiple DPDs                      TODO (M3)
+FIX-005   fixtures/cibil_no_hit.json        CIBIL no-hit (thin file) response                   TODO (M3)
+FIX-006   fixtures/experian_748.json        Experian score 748 response                         TODO (M3)
+FIX-007   fixtures/nsdl_pan_valid.json      PAN valid + Aadhaar seeded response                 TODO (M2)
+FIX-008   fixtures/nsdl_pan_inactive.json   PAN inactive response                               TODO (M2)
+FIX-009   fixtures/cbs_customer_created.xml CBS SOAP success response with CIF                  TODO (M4)
+FIX-010   fixtures/cbs_duplicate.xml        CBS SOAP duplicate customer error                   TODO (M4)
+FIX-011   fixtures/npci_imps_success.json   NPCI IMPS success with UTR                         TODO (M5)
+FIX-012   fixtures/npci_imps_failed.json    NPCI IMPS failure response                         TODO (M5)
+FIX-013   fixtures/salary_slip_jun.pdf      Test salary slip PDF (synthetic data)               TODO (M2)
+FIX-014   fixtures/bank_stmt_3m.pdf         Test bank statement 3 months (synthetic)            TODO (M2)
+FIX-015   fixtures/test_selfie.jpg          Approved test selfie for face match bypass          TODO (M2)
+FIX-016   fixtures/blurry_salary_slip.jpg   Low-quality image for OCR failure test              TODO (M2)
+
+
+SECTION 9: POSTMAN COLLECTIONS
+------------------------------------------------------
+
+ID        FILE NAME                          DESCRIPTION                                          STATUS
+------------------------------------------------------
+POST-001  postman/LOS-Auth-Service.json      Auth service collection — OTP, JWT, refresh          TODO (M1)
+POST-002  postman/LOS-Application.json       Application CRUD, submit, list, stage history        TODO (M2)
+POST-003  postman/LOS-KYC.json               Aadhaar initiate, verify, PAN, face-match           TODO (M2)
+POST-004  postman/LOS-Documents.json         Upload URL, confirm, list, review                   TODO (M2)
+POST-005  postman/LOS-Bureau.json            Pull, status, report                                TODO (M3)
+POST-006  postman/LOS-Decision.json          Trigger, result, manual override                    TODO (M4)
+POST-007  postman/LOS-Loan.json              Sanction, EMI schedule, disburse                    TODO (M5)
+POST-008  postman/LOS-Environment-UAT.json   UAT environment variables                           TODO (M5)
+POST-009  postman/LOS-Environment-PROD.json  Production environment variables                    TODO (M8)
+
+
+SECTION 10: SUMMARY METRICS
+------------------------------------------------------
+
+Total documents planned:          50+
+Documents completed (this batch): 13
+Completion %:                     26% (Phase 1 documentation complete)
+
+Next batch recommended:
+  - Postman collection (CODE-level)
+  - Terraform infrastructure code
+  - Service implementation code (start with Auth + Application)
+  - DB migration scripts
+
+Critical path blockers:
+  - UIDAI AUA license (start immediately — 6-8 weeks)
+  - CBS WSDL access from bank IT team
+  - CIBIL commercial agreement sign-off
+
+=======================================================
+END OF ARTIFACTS LIST

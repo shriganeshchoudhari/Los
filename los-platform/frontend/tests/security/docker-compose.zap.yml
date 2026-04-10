@@ -1,0 +1,24 @@
+version: '3.9'
+services:
+  zap:
+    image: owasp/zap2docker-stable:latest
+    container_name: los-zap-scan
+    command: zap-baseline.py -t {{TARGET_URL}} -J zap-results.json -r zap-report.html {{ZAP_OPTS}}
+    volumes:
+      - ./zap-results.json:/zap/wrkdir/zap-results.json
+      - ./zap-report.html:/zap/wrkdir/zap-report.html
+    environment:
+      - TARGET_URL={{TARGET_URL}}
+      - ZAP_OPTS=-config api.key={{ZAP_API_KEY}}
+    restart: unless-stopped
+
+  zap-full-scan:
+    image: owasp/zap2docker-stable:latest
+    container_name: los-zap-full-scan
+    command: zap-full-scan.py -t {{TARGET_URL}} -J zap-full-results.json -r zap-full-report.html
+    volumes:
+      - ./zap-full-results.json:/zap/wrkdir/zap-full-results.json
+      - ./zap-full-report.html:/zap/wrkdir/zap-full-report.html
+    environment:
+      - TARGET_URL={{TARGET_URL}}
+    restart: unless-stopped

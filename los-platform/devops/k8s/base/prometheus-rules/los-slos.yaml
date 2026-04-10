@@ -1,0 +1,164 @@
+# LOS Platform SLO Definitions
+# Target: Availability 99.5%, Latency P95 < 1.5s, Error Rate < 0.5%
+
+service_level:
+
+  # ── SLO: API Availability ────────────────────────────────────────────────
+  slos:
+
+    - name: los-platform-availability
+      description: "LOS Platform API availability — requests that return non-5xx within 10s"
+      service: los-platform
+      sli: event-ratio
+      target: 0.995
+      window: 30d
+      good_events:
+        metric: http_requests_total
+        filter: job=~"los-.*", status!~"5..", duration_ms < 10000
+      total_events:
+        metric: http_requests_total
+        filter: job=~"los-.*"
+      alert_on_breach: true
+      alert_severity: critical
+
+    - name: los-auth-availability
+      description: "Auth service availability"
+      service: los-auth-service
+      sli: event-ratio
+      target: 0.999
+      window: 30d
+      good_events:
+        metric: http_requests_total
+        filter: job="los-auth", status!~"5.."
+      total_events:
+        metric: http_requests_total
+        filter: job="los-auth"
+      alert_on_breach: true
+      alert_severity: critical
+
+    - name: los-decision-availability
+      description: "Decision Engine availability"
+      service: los-decision-engine
+      sli: event-ratio
+      target: 0.998
+      window: 30d
+      good_events:
+        metric: http_requests_total
+        filter: job="los-decision", status!~"5.."
+      total_events:
+        metric: http_requests_total
+        filter: job="los-decision"
+      alert_on_breach: true
+      alert_severity: critical
+
+    # ── SLO: API Latency ────────────────────────────────────────────────────
+    - name: los-platform-latency-p95
+      description: "P95 request latency < 1.5s"
+      service: los-platform
+      sli: latency
+      target: 0.995
+      window: 30d
+      threshold_ms: 1500
+      filter: job=~"los-.*"
+      alert_on_breach: true
+      alert_severity: warning
+
+    - name: los-platform-latency-p99
+      description: "P99 request latency < 5s"
+      service: los-platform
+      sli: latency
+      target: 0.99
+      window: 30d
+      threshold_ms: 5000
+      filter: job=~"los-.*"
+      alert_on_breach: true
+      alert_severity: warning
+
+    - name: los-bureau-pull-latency
+      description: "Bureau pull API P95 latency < 5s"
+      service: los-integration-service
+      sli: latency
+      target: 0.99
+      window: 30d
+      threshold_ms: 5000
+      filter: job="los-integration", route=~"bureau.*"
+      alert_on_breach: true
+      alert_severity: warning
+
+    # ── SLO: Business Metrics ──────────────────────────────────────────────
+    - name: los-application-intake
+      description: "Minimum 5 applications/minute processed"
+      service: los-platform
+      sli: throughput
+      target: 0.99
+      window: 30d
+      minimum_rate: 5
+      metric: increase(los_loan_applications_created_total[1m])
+      alert_on_breach: true
+      alert_severity: warning
+
+    - name: los-bureau-success-rate
+      description: "Bureau pull success rate > 90%"
+      service: los-integration-service
+      sli: event-ratio
+      target: 0.90
+      window: 30d
+      good_events:
+        metric: los_bureau_pulls_total
+        filter: status="SUCCESS"
+      total_events:
+        metric: los_bureau_pulls_total
+      alert_on_breach: true
+      alert_severity: warning
+
+    - name: los-disbursement-success-rate
+      description: "Disbursement success rate > 95%"
+      service: los-integration-service
+      sli: event-ratio
+      target: 0.95
+      window: 30d
+      good_events:
+        metric: los_disbursements_total
+        filter: status="SUCCESS"
+      total_events:
+        metric: los_disbursements_total
+      alert_on_breach: true
+      alert_severity: warning
+
+    - name: los-decision-processing-time
+      description: "P95 credit decision time < 60 seconds"
+      service: los-decision-engine
+      sli: latency
+      target: 0.99
+      window: 30d
+      threshold_ms: 60000
+      filter: job="los-decision"
+      alert_on_breach: true
+      alert_severity: warning
+
+# Error budget policies
+error_budget_policy:
+  name: los-platform-error-budget
+  burn_rate_alerts:
+    - severity: critical
+      burn_rate_threshold: 14.4   # 1% of budget burned in 1h = 5% in 6h
+      alert: LOSErrorBudgetBurningFast
+      description: "Error budget is burning at >14x the sustainable rate"
+    - severity: warning
+      burn_rate_threshold: 6
+      alert: LOSErrorBudgetBurning
+      description: "Error budget is burning at >6x the sustainable rate"
+    - severity: warning
+      burn_rate_threshold: 3
+      alert: LOSErrorBudgetWarning
+      description: "Error budget is burning at >3x the sustainable rate"
+
+# Alert notification routing
+notification_routing:
+  critical:
+    - channel: pagerduty-los-platform
+      urgent: true
+    - channel: slack-alerts-critical
+  warning:
+    - channel: slack-alerts-warning
+    - channel: email-ops-team

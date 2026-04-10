@@ -1,0 +1,320 @@
+name: LOS Platform CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - 'devops/**'
+      - 'database/**'
+      - 'frontend/**'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'backend/**/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci --workspaces --if-present
+
+      - name: Run ESLint
+        run: |
+          cd backend
+          npm run lint --workspaces --if-present
+
+      - name: Run TypeScript type check
+        run: |
+          cd backend
+          npm run typecheck --workspaces --if-present
+
+      - name: Run Unit Tests
+        run: |
+          cd backend
+          npm run test --workspaces --if-present -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/**/coverage/lcov.info
+          fail_ci_if_error: false
+
+  build-docker:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    strategy:
+      matrix:
+        service:
+          - auth-service
+          - loan-service
+          - kyc-service
+          - decision-engine
+          - integration-service
+          - notification-service
+          - dsa-service
+          - document-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/${{ matrix.service }}
+          dockerfile: ../../devops/docker/Dockerfile.${{ matrix.service }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ matrix.service }}:${{ github.ref == 'refs/heads/main' && 'prod-latest' || 'dev-latest' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  performance-tests:
+    needs: e2e-tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install k6
+        run: go install go.k6.io/k6@latest
+
+      - name: Run smoke test
+        run: |
+          k6 run frontend/tests/performance/k6-smoke-test.js
+        env:
+          BASE_URL: ${{ secrets.PERF_TEST_URL }}
+          K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
+
+      - name: Run load test
+        run: |
+          k6 run frontend/tests/performance/k6-load-test.js
+        env:
+          BASE_URL: ${{ secrets.PERF_TEST_URL }}
+          AUTH_URL: ${{ secrets.PERF_TEST_AUTH_URL }}
+          KYC_URL: ${{ secrets.PERF_TEST_KYC_URL }}
+          DOC_URL: ${{ secrets.PERF_TEST_DOC_URL }}
+          K6_CLOUD_TOKEN: ${{ secrets.K6_CLOUD_TOKEN }}
+
+      - name: Upload k6 results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-results-${{ github.run_number }}
+          path: |
+            frontend/tests/performance/load-test-results.json
+          retention-days: 14
+
+  security-scan:
+    needs: e2e-tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP baseline scan
+        run: |
+          docker run --rm \
+            -v $(pwd)/frontend/tests/security/reports:/zap/wrkdir:rw \
+            owasp/zap2docker-stable:latest \
+            zap-baseline.py \
+              -t ${{ secrets.SECURITY_SCAN_URL }} \
+              -J frontend/tests/security/reports/zap-results.json \
+              -r frontend/tests/security/reports/zap-report.html \
+              -config api.key=zap
+
+      - name: Upload ZAP report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report-${{ github.run_number }}
+          path: |
+            frontend/tests/security/reports/zap-results.json
+            frontend/tests/security/reports/zap-report.html
+          retention-days: 30
+
+  deploy-dev:
+    needs: [build-docker, e2e-tests]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kustomize
+        uses: kustomize/setup-kustomize@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Deploy to Dev
+        run: |
+          cd devops/k8s/overlays/dev
+          kustomize edit set image ${ECR_REGISTRY}/auth-service=${ECR_REGISTRY}/auth-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/loan-service=${ECR_REGISTRY}/loan-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/integration-service=${ECR_REGISTRY}/integration-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/notification-service=${ECR_REGISTRY}/notification-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/dsa-service=${ECR_REGISTRY}/dsa-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/document-service=${ECR_REGISTRY}/document-service:dev-latest
+          kustomize build . | kubectl apply -f -
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_DEV }}
+
+  e2e-tests:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps chromium
+
+      - name: Run database seed
+        run: |
+          cd frontend
+          node tests/seed/seed-db.js --env dev || true
+        env:
+          DB_HOST: ${{ secrets.DEV_DB_HOST }}
+          DB_NAME: ${{ secrets.DEV_DB_NAME }}
+          DB_USER: ${{ secrets.DEV_DB_USER }}
+          DB_PASSWORD: ${{ secrets.DEV_DB_PASSWORD }}
+
+      - name: Start services (smoke test only)
+        run: |
+          cd frontend
+          timeout 30 npm run dev || true
+        background: true
+
+      - name: Wait for services
+        run: sleep 15
+
+      - name: Run Playwright E2E tests
+        run: |
+          cd frontend
+          npx playwright test --config=tests/e2e/playwright.config.ts --project=chromium --reporter=html,json
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          TEST_API_URL: http://localhost:3001
+          TEST_AUTH_URL: http://localhost:3002
+          TEST_KYC_URL: http://localhost:3003
+          TEST_DOC_URL: http://localhost:3009
+          CI: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_number }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ github.run_number }}
+          path: frontend/playwright-report/results.json
+          retention-days: 14
+
+  deploy-uat:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup kustomize
+        uses: kustomize/setup-kustomize@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Deploy to UAT
+        run: |
+          cd devops/k8s/overlays/uat
+          kustomize edit set image ${ECR_REGISTRY}/auth-service=${ECR_REGISTRY}/auth-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/loan-service=${ECR_REGISTRY}/loan-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/integration-service=${ECR_REGISTRY}/integration-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/notification-service=${ECR_REGISTRY}/notification-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/dsa-service=${ECR_REGISTRY}/dsa-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/document-service=${ECR_REGISTRY}/document-service:uat-latest
+          kustomize build . | kubectl apply -f -
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG_UAT }}
+
+  database-migration:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run database migrations
+        run: |
+          echo "Running migrations against UAT database..."
+          # Migration command would go here
+          # npm run migrate -- --connection-url=${{ secrets.UAT_DB_URL }}

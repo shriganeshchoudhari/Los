@@ -1,0 +1,372 @@
+{
+  "info": {
+    "name": "LOS Platform API Collection",
+    "description": "Complete API collection for the Loan Origination System platform. Covers Auth, Loan Application, KYC, Document, and Decision microservices.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3001" },
+    { "key": "authBaseUrl", "value": "http://localhost:3002" },
+    { "key": "kycBaseUrl", "value": "http://localhost:3003" },
+    { "key": "documentBaseUrl", "value": "http://localhost:3009" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "applicationId", "value": "" },
+    { "key": "sessionId", "value": "" },
+    { "key": "mobile", "value": "9876543210" },
+    { "key": "testPan", "value": "AAUPG9999Z" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth Service",
+      "item": [
+        {
+          "name": "Send OTP",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 201', () => pm.response.to.have.status(201));", "const json = pm.response.json();", "pm.collectionVariables.set('sessionId', json.sessionId);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"purpose\": \"LOGIN\",\n  \"channel\": \"SMS\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{authBaseUrl}}/auth/otp/send", "host": ["{{authBaseUrl}}"], "path": ["auth", "otp", "send"] }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.collectionVariables.set('accessToken', json.accessToken);", "pm.collectionVariables.set('refreshToken', json.refreshToken);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"otp\": \"123456\",\n  \"sessionId\": \"{{sessionId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{authBaseUrl}}/auth/otp/verify", "host": ["{{authBaseUrl}}"], "path": ["auth", "otp", "verify"] }
+          }
+        },
+        {
+          "name": "LDAP Login",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const json = pm.response.json();", "pm.collectionVariables.set('accessToken', json.accessToken);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"jsmith\",\n  \"password\": \"TestPassword123!\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{authBaseUrl}}/auth/ldap/login", "host": ["{{authBaseUrl}}"], "path": ["auth", "ldap", "login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{authBaseUrl}}/auth/token/refresh", "host": ["{{authBaseUrl}}"], "path": ["auth", "token", "refresh"] }
+          }
+        },
+        {
+          "name": "Logout / Revoke Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "body": { "mode": "raw", "raw": "{\n  \"tokenOrJti\": \"{{accessToken}}\",\n  \"reason\": \"User logout\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{authBaseUrl}}/auth/revoke", "host": ["{{authBaseUrl}}"], "path": ["auth", "revoke"] }
+          }
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{authBaseUrl}}/auth/profile", "host": ["{{authBaseUrl}}"], "path": ["auth", "profile"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loan Application Service",
+      "item": [
+        {
+          "name": "Create Application",
+          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json();", "pm.collectionVariables.set('applicationId', json.applicationId);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"loanType\": \"PERSONAL_LOAN\",\n  \"branchCode\": \"BR001\",\n  \"applicant\": {\n    \"fullName\": \"Ravi Kumar Sharma\",\n    \"dob\": \"1990-04-21\",\n    \"mobile\": \"{{mobile}}\",\n    \"panNumber\": \"{{testPan}}\"\n  },\n  \"employmentDetails\": {\n    \"employmentType\": \"SALARIED_PRIVATE\",\n    \"employerName\": \"Infosys Limited\",\n    \"netMonthlyIncome\": 95000\n  },\n  \"loanRequirement\": {\n    \"requestedAmount\": 500000,\n    \"tenureMonths\": 36\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/applications", "host": ["{{baseUrl}}"], "path": ["applications"] }
+          }
+        },
+        {
+          "name": "Get Application",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{applicationId}}", "host": ["{{baseUrl}}"], "path": ["applications", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "List Applications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/applications?page=0&size=20&status=DRAFT", "host": ["{{baseUrl}}"], "path": ["applications"], "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "20" }, { "key": "status", "value": "DRAFT" }] }
+          }
+        },
+        {
+          "name": "Auto-save Application",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" },
+              { "key": "X-Idempotency-Key", "value": "{{$guid}}", "type": "text" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"section\": \"applicant\",\n  \"data\": {\n    \"email\": \"ravi.sharma@example.com\"\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/applications/{{applicationId}}/autosave", "host": ["{{baseUrl}}"], "path": ["applications", "{{applicationId}}", "autosave"] }
+          }
+        },
+        {
+          "name": "Calculate FOIR",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{applicationId}}/foir", "host": ["{{baseUrl}}"], "path": ["applications", "{{applicationId}}", "foir"] }
+          }
+        },
+        {
+          "name": "Assign Officer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{applicationId}}/assign-officer", "host": ["{{baseUrl}}"], "path": ["applications", "{{applicationId}}", "assign-officer"] }
+          }
+        },
+        {
+          "name": "Submit Application",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/applications/{{applicationId}}/submit", "host": ["{{baseUrl}}"], "path": ["applications", "{{applicationId}}", "submit"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "KYC Service",
+      "item": [
+        {
+          "name": "Capture Consent",
+          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json();", "if (json.sessionId) pm.collectionVariables.set('sessionId', json.sessionId);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"consentType\": \"KYC_AADHAAR_EKYC\",\n  \"consentText\": \"I consent to Aadhaar eKYC verification\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/consent", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "consent"] }
+          }
+        },
+        {
+          "name": "Initiate Aadhaar KYC",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"consentOtpSessionId\": \"{{sessionId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/aadhaar/init", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "aadhaar", "init"] }
+          }
+        },
+        {
+          "name": "Verify Aadhaar OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"txnId\": \"TXN123\",\n  \"uidaiRefId\": \"REF123\",\n  \"otp\": \"123456\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/aadhaar/verify", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "aadhaar", "verify"] }
+          }
+        },
+        {
+          "name": "Offline XML KYC",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }, { "key": "Content-Type", "value": "multipart/form-data" }],
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "offline_kyc_sample.xml" }, { "key": "applicationId", "value": "{{applicationId}}", "type": "text" }] },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/aadhaar/offline", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "aadhaar", "offline"] }
+          }
+        },
+        {
+          "name": "Verify PAN",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"panNumber\": \"{{testPan}}\",\n  \"fullName\": \"RAVI KUMAR SHARMA\",\n  \"dob\": \"1990-04-21\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/pan/verify", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "pan", "verify"] }
+          }
+        },
+        {
+          "name": "Face Match",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"selfieImageBase64\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/face/match", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "face", "match"] }
+          }
+        },
+        {
+          "name": "Check KYC Completion",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{kycBaseUrl}}/kyc/check-completion", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "check-completion"] }
+          }
+        },
+        {
+          "name": "Get KYC Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{kycBaseUrl}}/kyc/{{applicationId}}", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "KYC Reuse Check",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{kycBaseUrl}}/kyc/reuse/check?aadhaarHash=hash123", "host": ["{{kycBaseUrl}}"], "path": ["kyc", "reuse", "check"], "query": [{ "key": "aadhaarHash", "value": "hash123" }] }
+          }
+        },
+        {
+          "name": "DigiLocker Auth URL",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{kycBaseUrl}}/digilocker/auth-url?applicationId={{applicationId}}", "host": ["{{kycBaseUrl}}"], "path": ["digilocker", "auth-url"], "query": [{ "key": "applicationId", "value": "{{applicationId}}" }] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Document Service",
+      "item": [
+        {
+          "name": "Get Presigned Upload URL",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"documentType\": \"SALARY_SLIP\",\n  \"fileName\": \"salary_slip_jan_2024.pdf\",\n  \"mimeType\": \"application/pdf\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{documentBaseUrl}}/documents/upload-url", "host": ["{{documentBaseUrl}}"], "path": ["documents", "upload-url"] }
+          }
+        },
+        {
+          "name": "Confirm Upload",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"documentType\": \"SALARY_SLIP\",\n  \"uploadId\": \"upload-uuid-123\",\n  \"checksum\": \"sha256-hash-here\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{documentBaseUrl}}/documents/confirm-upload", "host": ["{{documentBaseUrl}}"], "path": ["documents", "confirm-upload"] }
+          }
+        },
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{documentBaseUrl}}/documents/{{applicationId}}", "host": ["{{documentBaseUrl}}"], "path": ["documents", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "Review Document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"documentId\": \"doc-uuid-123\",\n  \"decision\": \"APPROVED\",\n  \"comments\": \"Document verified and legible\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{documentBaseUrl}}/documents/review", "host": ["{{documentBaseUrl}}"], "path": ["documents", "review"] }
+          }
+        },
+        {
+          "name": "Get Document Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{documentBaseUrl}}/documents/{{applicationId}}/stats", "host": ["{{documentBaseUrl}}"], "path": ["documents", "{{applicationId}}", "stats"] }
+          }
+        },
+        {
+          "name": "Create Document Checklist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"documentType\": \"SALARY_SLIP\",\n  \"required\": true,\n  \"notes\": \"Last 3 months salary slips required\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{documentBaseUrl}}/documents/checklist", "host": ["{{documentBaseUrl}}"], "path": ["documents", "checklist"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Decision Service",
+      "item": [
+        {
+          "name": "Trigger Decision",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/decision/trigger", "host": ["{{baseUrl}}"], "path": ["decision", "trigger"] }
+          }
+        },
+        {
+          "name": "Get Decision",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/decision/{{applicationId}}", "host": ["{{baseUrl}}"], "path": ["decision", "{{applicationId}}"] }
+          }
+        },
+        {
+          "name": "Request Override",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\",\n  \"reason\": \"Customer is an existing FD holder with the bank\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/decision/override/request", "host": ["{{baseUrl}}"], "path": ["decision", "override", "request"] }
+          }
+        },
+        {
+          "name": "Get Rate Preview",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "url": { "raw": "{{baseUrl}}/decision/{{applicationId}}/rate-preview", "host": ["{{baseUrl}}"], "path": ["decision", "{{applicationId}}", "rate-preview"] }
+          }
+        },
+        {
+          "name": "Initiate Disbursement",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}", "type": "text" }],
+            "body": { "mode": "raw", "raw": "{\n  \"applicationId\": \"{{applicationId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/disbursement/initiate", "host": ["{{baseUrl}}"], "path": ["disbursement", "initiate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Auth Service Health",
+          "request": { "method": "GET", "url": { "raw": "{{authBaseUrl}}/health", "host": ["{{authBaseUrl}}"], "path": ["health"] } }
+        },
+        {
+          "name": "Loan Service Health",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] } }
+        },
+        {
+          "name": "KYC Service Health",
+          "request": { "method": "GET", "url": { "raw": "{{kycBaseUrl}}/health", "host": ["{{kycBaseUrl}}"], "path": ["health"] } }
+        },
+        {
+          "name": "Document Service Health",
+          "request": { "method": "GET", "url": { "raw": "{{documentBaseUrl}}/health", "host": ["{{documentBaseUrl}}"], "path": ["health"] } }
+        }
+      ]
+    }
+  ]
+}

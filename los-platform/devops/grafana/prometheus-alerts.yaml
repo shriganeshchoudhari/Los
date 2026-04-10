@@ -1,0 +1,257 @@
+groups:
+  - name: los-platform-application-alerts
+    rules:
+      - alert: HighRejectionRate
+        expr: |
+          (
+            sum(rate(los_application_total{status="REJECTED"}[5m]))
+            /
+            sum(rate(los_application_total[5m]))
+          ) > 0.4
+        for: 10m
+        labels:
+          severity: critical
+          team: credit-ops
+        annotations:
+          summary: "High loan application rejection rate"
+          description: "Application rejection rate is {{ $value | humanizePercentage }} (threshold: 40%) for the last 10 minutes. Investigate credit policy changes or data quality issues."
+
+      - alert: HighWithdrawalRate
+        expr: |
+          (
+            sum(rate(los_application_total{status="WITHDRAWN"}[5m]))
+            /
+            sum(rate(los_application_total[5m]))
+          ) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          team: sales-ops
+        annotations:
+          summary: "High application withdrawal rate"
+          description: "Application withdrawal rate is {{ $value | humanizePercentage }} (threshold: 20%). Review drop-off points in the application flow."
+
+      - alert: LowConversionRate
+        expr: |
+          (
+            sum(los_application_by_status{status="DISBURSED"})
+            /
+            sum(los_application_total)
+          ) < 0.25
+        for: 1h
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "Low end-to-end loan conversion rate"
+          description: "Conversion rate from submitted to disbursed applications is {{ $value | humanizePercentage }} (expected: >25%). Review bottleneck stages."
+
+      - alert: ApplicationProcessingBacklog
+        expr: |
+          sum(los_application_by_status{status=~"UNDER_PROCESSING|CREDIT_ASSESSMENT|PENDING_FIELD_INVESTIGATION|PENDING_LEGAL_TECHNICAL"}) > 200
+        for: 30m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "High number of applications stuck in processing"
+          description: "{{ $value }} applications are in intermediate processing states for >30 minutes. Check decision engine and analyst throughput."
+
+  - name: los-platform-kyc-alerts
+    rules:
+      - alert: KycServiceDown
+        expr: los_http_requests_total{service="kyc-service", status!="", status!~"2.."} == 0 and sum(rate(los_http_requests_total{service="kyc-service"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "KYC service appears to be down or returning errors"
+          description: "KYC service has 0 successful HTTP responses in 2 minutes while traffic exists. Check kyc-service pod health and UIDAI/NSDL connectivity."
+
+      - alert: KycProviderHighFailureRate
+        expr: |
+          (
+            sum(rate(los_kyc_verifications_total{result="failure"}[5m])) by (provider)
+            /
+            sum(rate(los_kyc_verifications_total{provider!=""}[5m])) by (provider)
+          ) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High KYC failure rate for {{ $labels.provider }}"
+          description: "KYC provider {{ $labels.provider }} has {{ $value | humanizePercentage }} failure rate (threshold: 20%). Check ASA license, API keys, and upstream provider status."
+
+      - alert: KycHighLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le, provider) (rate(los_kyc_verification_duration_seconds_bucket[5m]))) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "KYC verification latency above 10s for {{ $labels.provider }}"
+          description: "p95 KYC verification latency for {{ $labels.provider }} is {{ $value }}s. Consider circuit breaker or fallback provider."
+
+  - name: los-platform-decision-alerts
+    rules:
+      - alert: DecisionTimeoutP99
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(los_decision_duration_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: credit-ops
+        annotations:
+          summary: "Decision engine p99 latency above 30 seconds"
+          description: "p99 decision latency is {{ $value }}s (threshold: 30s). Check ML model loading, rule evaluation, and bureau pull times."
+
+      - alert: DecisionEngineDown
+        expr: |
+          sum(rate(los_http_requests_total{service="decision-engine", status=~"5.."}[5m])) / sum(rate(los_http_requests_total{service="decision-engine"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Decision engine returning >50% errors"
+          description: "Decision engine has >50% error rate. Check database connectivity and ML model availability."
+
+      - alert: HighOverrideRequestRate
+        expr: |
+          sum(rate(los_decisions_total{decision="CONDITIONALLY_APPROVED"}[5m]))
+          /
+          sum(rate(los_decisions_total[5m])) > 0.15
+        for: 30m
+        labels:
+          severity: warning
+          team: credit-ops
+        annotations:
+          summary: "High conditional approval rate"
+          description: "{{ $value | humanizePercentage }} of decisions are conditional approvals. Review scorecard thresholds."
+
+  - name: los-platform-pdd-alerts
+    rules:
+      - alert: PddBreachRate
+        expr: |
+          increase(los_pdd_breaches_total[1h]) > 5
+        for: 0m
+        labels:
+          severity: critical
+          team: collections
+        annotations:
+          summary: "High PDD breach rate in last hour"
+          description: "{{ $value }} PDD breaches in the last hour (threshold: 5). Collections team should be alerted immediately."
+
+      - alert: PddOverdueIncreasing
+        expr: |
+          sum(los_pdd_overdue) - sum(los_pdd_overdue offset 1h) > 10
+        for: 0m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "PDD overdue count increasing rapidly"
+          description: "PDD overdue increased by {{ $value }} in the last hour. Reminder notifications may not be reaching customers."
+
+      - alert: HighPddOverdueByBranch
+        expr: |
+          sum by (branch_code) (los_pdd_overdue) > 20
+        for: 1h
+        labels:
+          severity: warning
+          team: branch-ops
+        annotations:
+          summary: "Branch {{ $labels.branch_code }} has high PDD overdue count"
+          description: "Branch {{ $labels.branch_code }} has {{ $value }} overdue PDD items. Escalate to branch manager."
+
+  - name: los-platform-infrastructure-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(los_http_requests_total{status=~"5.."}[5m])) by (service)
+            /
+            sum(rate(los_http_requests_total[5m])) by (service)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "{{ $labels.service }} error rate above 5%"
+          description: "{{ $labels.service }} has {{ $value | humanizePercentage }} 5xx error rate. Investigate immediately."
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le, service) (rate(los_http_request_duration_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "{{ $labels.service }} p95 latency above 5 seconds"
+          description: "{{ $labels.service }} p95 HTTP latency is {{ $value }}s. Check database queries and external dependencies."
+
+      - alert: CircuitBreakerOpen
+        expr: |
+          los_circuit_breaker_state == 2
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Circuit breaker OPEN for {{ $labels.integration }}"
+          description: "Circuit breaker for {{ $labels.integration }} is OPEN. Downstream service is unavailable. Check upstream provider health."
+
+      - alert: KafkaProduceErrors
+        expr: |
+          increase(los_kafka_produce_errors_total[5m]) > 10
+        for: 0m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High Kafka produce error rate"
+          description: "{{ $value }} Kafka produce errors in last 5 minutes. Check Kafka broker connectivity and message format."
+
+      - alert: DatabaseQuerySlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(los_db_query_duration_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Database p95 query latency above 2 seconds"
+          description: "p95 database query latency is {{ $value }}s. Check for missing indexes, lock contention, or connection pool exhaustion."
+
+  - name: los-platform-esign-alerts
+    rules:
+      - alert: HighESignFailureRate
+        expr: |
+          (
+            sum(rate(los_esign_transactions_total{status="FAILED"}[5m]))
+            /
+            sum(rate(los_esign_transactions_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "eSign failure rate above 10%"
+          description: "eSign transaction failure rate is {{ $value | humanizePercentage }}. Check NSDL eSign API status and token validity."
+
+      - alert: ESignServiceHighLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(los_esign_duration_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "eSign transaction p95 latency above 30 seconds"
+          description: "eSign p95 latency is {{ $value }}s. NSDL eSign API may be slow or token refresh failing."

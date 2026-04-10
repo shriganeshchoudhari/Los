@@ -1,0 +1,922 @@
+### LOS Platform API Tests (VS Code REST Client)
+### Run against your local Docker environment
+### Update variables below to match your environment
+
+@baseUrl = http://localhost:3001
+@kycService = http://localhost:3002
+@loanService = http://localhost:3003
+@decisionService = http://localhost:3004
+@documentService = http://localhost:3009
+@integrationService = http://localhost:3006
+@notificationService = http://localhost:3007
+@dsaService = http://localhost:3008
+
+@mobile = 9876543210
+@otp = 123456
+@testPan = ABCDE1234F
+@aadhaarNumber = 123456789012
+@testPanNumber = ABCDE1234F
+
+###############################################################################
+# 0. HEALTH CHECKS
+###############################################################################
+
+### Auth Service Health
+GET {{baseUrl}}/health
+
+### KYC Service Health
+GET {{kycService}}/health
+
+### Loan Service Health
+GET {{loanService}}/health
+
+### Decision Engine Health
+GET {{decisionService}}/health
+
+### Integration Service Health
+GET {{integrationService}}/health
+
+### DSA Service Health
+GET {{dsaService}}/health
+
+###############################################################################
+# 1. AUTH SERVICE
+###############################################################################
+
+### Send OTP (SMS)
+# @name sendOtp
+POST {{baseUrl}}/auth/otp/send
+Content-Type: application/json
+
+{
+  "mobile": "{{mobile}}",
+  "purpose": "LOGIN",
+  "channel": "SMS"
+}
+
+> {%
+    if (response.body.success) {
+        client.global.set("sessionId", response.body.data.sessionId);
+        client.global.set("maskedMobile", response.body.data.maskedMobile);
+    }
+%}
+
+### Verify OTP
+# @name verifyOtp
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "mobile": "{{mobile}}",
+  "otp": "{{otp}}",
+  "sessionId": "{{sessionId}}"
+}
+
+> {%
+    if (response.body.success) {
+        client.global.set("accessToken", response.body.data.accessToken);
+        client.global.set("refreshToken", response.body.data.refreshToken);
+    }
+%}
+
+### LDAP Staff Login
+# @name ldapLogin
+POST {{baseUrl}}/auth/ldap/login
+Content-Type: application/json
+
+{
+  "username": "loan_officer_01",
+  "password": "BankPass123!"
+}
+
+> {%
+    if (response.body.success) {
+        client.global.set("accessToken", response.body.data.accessToken);
+    }
+%}
+
+### Refresh Token
+POST {{baseUrl}}/auth/token/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+> {%
+    if (response.body.success) {
+        client.global.set("accessToken", response.body.data.accessToken);
+        client.global.set("refreshToken", response.body.data.refreshToken);
+    }
+%}
+
+### Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### JWKS (public key for JWT validation)
+GET {{baseUrl}}/.well-known/jwks.json
+
+###############################################################################
+# 2. LOAN SERVICE — APPLICATIONS
+###############################################################################
+
+### Create Personal Loan Application
+# @name createApplication
+POST {{loanService}}/applications
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Request-ID: {{$guid}}
+X-Idempotency-Key: {{$guid}}
+
+{
+  "loanType": "PERSONAL_LOAN",
+  "channelCode": "MOBILE_APP",
+  "branchCode": "MH001",
+  "applicant": {
+    "fullName": "Ravi Sharma",
+    "dob": "1990-04-21",
+    "gender": "MALE",
+    "maritalStatus": "MARRIED",
+    "mobile": "{{mobile}}",
+    "email": "ravi.sharma@example.com",
+    "residentialStatus": "RESIDENT_INDIAN",
+    "addresses": [{
+      "line1": "Flat 302, Orchid Heights",
+      "city": "Pune",
+      "district": "Pune",
+      "state": "MH",
+      "pincode": "411057",
+      "country": "IN",
+      "addressType": "CURRENT"
+    }],
+    "yearsAtCurrentAddress": 3,
+    "ownOrRentedResidence": "RENTED"
+  },
+  "employmentDetails": {
+    "employmentType": "SALARIED_PRIVATE",
+    "employerName": "Infosys Limited",
+    "employerPAN": "AAACI1681G",
+    "designation": "Senior Engineer",
+    "totalWorkExperienceMonths": 84,
+    "currentJobExperienceMonths": 50,
+    "grossMonthlyIncome": 120000,
+    "netMonthlyIncome": 95000,
+    "totalAnnualIncome": 1440000
+  },
+  "loanRequirement": {
+    "loanType": "PERSONAL_LOAN",
+    "requestedAmount": 500000,
+    "requestedTenureMonths": 36,
+    "purposeDescription": "Medical emergency"
+  }
+}
+
+> {%
+    if (response.body.success) {
+        client.global.set("applicationId", response.body.data.applicationId);
+        client.global.set("applicationNumber", response.body.data.applicationNumber);
+    }
+%}
+
+### Get Application
+GET {{loanService}}/applications/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+X-Request-ID: {{$guid}}
+
+### Update Application
+PATCH {{loanService}}/applications/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Request-ID: {{$guid}}
+
+{
+  "section": "APPLICANT",
+  "data": {
+    "email": "updated.email@example.com"
+  },
+  "version": 1
+}
+
+### Autosave Draft
+PATCH {{loanService}}/applications/{{applicationId}}/autosave
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "section": "EMPLOYMENT",
+  "data": {
+    "designation": "Lead Engineer"
+  }
+}
+
+### Get FOIR
+GET {{loanService}}/applications/{{applicationId}}/foir
+Authorization: Bearer {{accessToken}}
+
+### List Applications
+GET {{loanService}}/applications?status=DRAFT&page=0&size=20
+Authorization: Bearer {{accessToken}}
+
+### Submit Application
+POST {{loanService}}/applications/{{applicationId}}/submit
+Authorization: Bearer {{accessToken}}
+X-Request-ID: {{$guid}}
+
+###############################################################################
+# 3. LOAN SERVICE — EMI & RATES
+###############################################################################
+
+### Calculate EMI
+POST {{loanService}}/emi/calculate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "principal": 500000,
+  "annualRate": 10.5,
+  "tenureMonths": 36
+}
+
+### Amortization Schedule
+POST {{loanService}}/emi/amortization
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "principal": 500000,
+  "annualRate": 10.5,
+  "tenureMonths": 36,
+  "startDate": "2026-05-01"
+}
+
+### Foreclosure Calculation
+POST {{loanService}}/emi/foreclosure
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "loanId": "{{applicationId}}",
+  "foreclosureDate": "2027-05-01"
+}
+
+### Prepayment Calculation
+POST {{loanService}}/emi/prepayment
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "loanId": "{{applicationId}}",
+  "prepaymentAmount": 100000,
+  "prepaymentDate": "2027-01-01",
+  "adjustTenure": true
+}
+
+### Compare Loan Options
+POST {{loanService}}/emi/compare
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "options": [
+    { "principal": 500000, "annualRate": 10.5, "tenureMonths": 24 },
+    { "principal": 500000, "annualRate": 11.0, "tenureMonths": 36 },
+    { "principal": 500000, "annualRate": 12.0, "tenureMonths": 48 }
+  ]
+}
+
+### Interest Rate Preview
+GET {{decisionService}}/rates/preview?productCode=PERSONAL_LOAN&tenureMonths=36&loanAmount=500000
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 4. KYC SERVICE
+###############################################################################
+
+### Capture Consent
+POST {{kycService}}/kyc/consent
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "consentType": "KYC_VERIFICATION"
+}
+
+### Initiate Aadhaar OTP
+POST {{kycService}}/kyc/aadhaar/init
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "aadhaarNumber": "{{aadhaarNumber}}",
+  "applicationId": "{{applicationId}}"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("aadhaarTxnId", response.body.data.txnId || response.body.data.transactionId);
+    }
+%}
+
+### Verify Aadhaar OTP
+POST {{kycService}}/kyc/aadhaar/verify
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "txnId": "{{aadhaarTxnId}}",
+  "otp": "{{otp}}",
+  "applicationId": "{{applicationId}}"
+}
+
+### Verify PAN
+POST {{kycService}}/kyc/pan/verify
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "panNumber": "{{testPanNumber}}",
+  "fullName": "RAVI SHARMA",
+  "dob": "21-04-1990",
+  "applicationId": "{{applicationId}}"
+}
+
+### Face Match
+POST {{kycService}}/kyc/face/match
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "selfieImageBase64": "base64_encoded_jpeg_image"
+}
+
+### Get KYC Record
+GET {{kycService}}/kyc/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### Check KYC Reuse
+GET {{kycService}}/kyc/reuse/check?pan={{testPanNumber}}&dob=1990-04-21
+Authorization: Bearer {{accessToken}}
+
+### DigiLocker Auth URL
+GET {{kycService}}/digilocker/auth-url?applicationId={{applicationId}}&purpose=PAN
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 5. DOCUMENT SERVICE
+###############################################################################
+
+### Get Presigned URL
+# @name getPresignedUrl
+POST {{documentService}}/documents/presigned-url
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "documentType": "SALARY_SLIP",
+  "mimeType": "application/pdf"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("documentUploadId", response.body.data.uploadId || response.body.data.documentId);
+    }
+%}
+
+### Confirm Upload (after uploading to presigned URL)
+POST {{documentService}}/documents/confirm-upload
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "uploadId": "{{documentUploadId}}",
+  "applicationId": "{{applicationId}}",
+  "documentType": "SALARY_SLIP"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("documentId", response.body.data.documentId);
+    }
+%}
+
+### List Documents for Application
+GET {{documentService}}/applications/{{applicationId}}/documents
+Authorization: Bearer {{accessToken}}
+
+### Get Document Details
+GET {{documentService}}/documents/{{documentId}}
+Authorization: Bearer {{accessToken}}
+
+### Trigger OCR
+POST {{documentService}}/documents/{{documentId}}/ocr
+Authorization: Bearer {{accessToken}}
+
+### Generate Document Checklist
+POST {{documentService}}/documents/checklist
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "loanType": "PERSONAL_LOAN",
+  "employmentType": "SALARIED_PRIVATE"
+}
+
+### Get Checklist
+GET {{documentService}}/applications/{{applicationId}}/checklist
+Authorization: Bearer {{accessToken}}
+
+### Review Document (Approve)
+POST {{documentService}}/documents/{{documentId}}/review
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVED",
+  "remarks": "Salary slip verified, income matches application"
+}
+
+### Document Statistics
+GET {{documentService}}/documents/stats
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 6. INTEGRATION SERVICE — BUREAU & DISBURSEMENT
+###############################################################################
+
+### Bureau Consent
+POST {{integrationService}}/integration/bureau/consent
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "panNumber": "{{testPanNumber}}",
+  "consentText": "I authorize the bank to fetch my credit report for loan assessment"
+}
+
+### Pull Bureau Report
+POST {{integrationService}}/integration/bureau/pull
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "consentOtp": "{{otp}}"
+}
+
+### Get Bureau Reports
+GET {{integrationService}}/integration/bureau/reports?applicationId={{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### Initiate Disbursement (IMPS)
+# @name initiateDisbursement
+POST {{integrationService}}/integration/disbursement
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "amount": 500000,
+  "beneficiaryAccountNumber": "123456789012",
+  "beneficiaryIfsc": "SBIN0001234",
+  "beneficiaryName": "Ravi Sharma",
+  "mode": "IMPS"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("disbursementId", response.body.data.disbursementId || response.body.data.id);
+    }
+%}
+
+### List Disbursements
+GET {{integrationService}}/integration/disbursement?applicationId={{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### Get Disbursement Status
+GET {{integrationService}}/integration/disbursement/{{disbursementId}}
+Authorization: Bearer {{accessToken}}
+
+### Register NACH Mandate
+POST {{integrationService}}/integration/nach/mandate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "accountNumber": "123456789012",
+  "ifsc": "SBIN0001234",
+  "accountHolderName": "Ravi Sharma",
+  "emandateAmount": 16000,
+  "frequency": "MONTHLY",
+  "debitDay": 5
+}
+
+### Penny Drop Verification
+POST {{integrationService}}/integration/penny-drop/verify
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "accountNumber": "123456789012",
+  "ifsc": "SBIN0001234",
+  "applicationId": "{{applicationId}}"
+}
+
+###############################################################################
+# 7. DECISION ENGINE
+###############################################################################
+
+### Trigger Credit Decision
+POST {{decisionService}}/decisions/trigger
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}"
+}
+
+### Get Decision Result
+GET {{decisionService}}/decisions/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### Manual Override
+POST {{decisionService}}/decisions/override
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "decision": "APPROVED",
+  "overrideReason": "Exception approved: FOIR slightly above threshold but income growth is strong"
+}
+
+### List Active Rules
+GET {{decisionService}}/rules
+Authorization: Bearer {{accessToken}}
+
+### Test Rule Evaluation
+POST {{decisionService}}/rules/evaluate-context
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "context": {
+    "cibilScore": 745,
+    "foir": 45,
+    "loanAmount": 500000,
+    "employmentType": "SALARIED_PRIVATE"
+  }
+}
+
+### List ML Models
+GET {{decisionService}}/ml/models
+Authorization: Bearer {{accessToken}}
+
+### Policy Versions
+GET {{decisionService}}/policy/versions
+Authorization: Bearer {{accessToken}}
+
+### Rates Calculation
+POST {{decisionService}}/rates/calculate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "productCode": "PERSONAL_LOAN",
+  "tenureMonths": 36,
+  "loanAmount": 500000,
+  "riskScore": 745
+}
+
+###############################################################################
+# 8. LOAN SERVICE — SANCTION LETTER & AGREEMENT
+###############################################################################
+
+### Preview Sanction Letter
+GET {{loanService}}/sanction-letter/{{applicationId}}/preview
+Authorization: Bearer {{accessToken}}
+
+### Download Sanction Letter PDF
+GET {{loanService}}/sanction-letter/{{applicationId}}/pdf
+Authorization: Bearer {{accessToken}}
+
+### Generate Loan Agreement
+POST {{loanService}}/loan-agreement/generate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("agreementId", response.body.data.id);
+    }
+%}
+
+### Get Agreement
+GET {{loanService}}/loan-agreement/application/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### Initiate eSign
+# @name initiateESign
+POST {{loanService}}/loan-agreement/esign/initiate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "applicationId": "{{applicationId}}",
+  "signerName": "Ravi Sharma",
+  "signerMobile": "{{mobile}}",
+  "signerEmail": "ravi.sharma@example.com"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("esignTxnId", response.body.data.esignTransactionId);
+    }
+%}
+
+### Verify eSign OTP
+POST {{loanService}}/loan-agreement/esign/verify
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "transactionId": "{{esignTxnId}}",
+  "otp": "{{otp}}",
+  "aadhaarLast4": "9012"
+}
+
+### Cancel eSign
+POST {{loanService}}/loan-agreement/esign/cancel
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "transactionId": "{{esignTxnId}}",
+  "reason": "Customer requested cancellation"
+}
+
+### Get Signatures for Agreement
+GET {{loanService}}/loan-agreement/signatures/{{agreementId}}
+Authorization: Bearer {{accessToken}}
+
+### PDD Initiate
+POST {{loanService}}/pdd/{{applicationId}}/initiate
+Authorization: Bearer {{accessToken}}
+
+### PDD Get Checklist
+GET {{loanService}}/pdd/{{applicationId}}
+Authorization: Bearer {{accessToken}}
+
+### PDD Dashboard Summary
+GET {{loanService}}/pdd/dashboard/summary
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 9. NOTIFICATION SERVICE
+###############################################################################
+
+### Send SMS Notification
+POST {{notificationService}}/notifications/send
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "channel": "SMS",
+  "recipientId": "{{applicationId}}",
+  "templateName": "LOAN_SUBMITTED",
+  "variables": {
+    "applicationNumber": "{{applicationNumber}}",
+    "customerName": "Ravi Sharma"
+  },
+  "applicationId": "{{applicationId}}"
+}
+
+### Send Email Notification
+POST {{notificationService}}/notifications/send
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "channel": "EMAIL",
+  "recipientId": "{{applicationId}}",
+  "templateName": "SANCTION_LETTER",
+  "variables": {
+    "applicationNumber": "{{applicationNumber}}",
+    "customerName": "Ravi Sharma",
+    "sanctionedAmount": "500000"
+  },
+  "applicationId": "{{applicationId}}"
+}
+
+### Get Notification History
+GET {{notificationService}}/notifications/history?applicationId={{applicationId}}&page=0&limit=20
+Authorization: Bearer {{accessToken}}
+
+### List Notification Templates
+GET {{notificationService}}/notifications/templates
+Authorization: Bearer {{accessToken}}
+
+### Notification Statistics
+GET {{notificationService}}/notifications/stats
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 10. AUDIT LOGS
+###############################################################################
+
+### Query Audit Logs
+GET {{loanService}}/audit-logs?category=KYC&dateRange=7d&page=0&size=50
+Authorization: Bearer {{accessToken}}
+
+### Export Audit Logs CSV
+GET {{loanService}}/audit-logs/export?category=DECISION&dateRange=30d
+Authorization: Bearer {{accessToken}}
+
+###############################################################################
+# 11. DSA SERVICE
+###############################################################################
+
+### DSA Partner Registration
+POST {{dsaService}}/auth/register
+Content-Type: application/json
+
+{
+  "companyName": "ABC Financial Services Pvt Ltd",
+  "contactPerson": "Vikram Patel",
+  "mobile": "9876543211",
+  "email": "vikram@abcfinserv.com",
+  "pan": "AABCA1234B",
+  "gstin": "27AABCA1234B1ZA",
+  "address": {
+    "line1": "101, Business Hub",
+    "city": "Mumbai",
+    "state": "MH",
+    "pincode": "400001"
+  },
+  "bankAccount": {
+    "accountNumber": "9876543210987",
+    "ifsc": "HDFC0000001",
+    "accountHolderName": "ABC Financial Services"
+  }
+}
+
+### DSA Partner Login
+# @name dsaLogin
+POST {{dsaService}}/auth/login
+Content-Type: application/json
+
+{
+  "partnerCode": "ABC001",
+  "password": "DSA@Pass123!"
+}
+
+> {%
+    if (response.body.data) {
+        client.global.set("dsaToken", response.body.data.accessToken);
+    }
+%}
+
+### DSA Refresh Token
+POST {{dsaService}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "your-refresh-token"
+}
+
+### DSA Dashboard
+GET {{dsaService}}/dashboard
+Authorization: Bearer {{dsaToken}}
+
+### DSA Create Application
+POST {{dsaService}}/applications
+Authorization: Bearer {{dsaToken}}
+Content-Type: application/json
+
+{
+  "loanType": "PERSONAL_LOAN",
+  "channelCode": "DSA_REFERRAL",
+  "branchCode": "MH001",
+  "applicant": {
+    "fullName": "Priya Verma",
+    "dob": "1992-08-15",
+    "gender": "FEMALE",
+    "mobile": "9876543212",
+    "email": "priya.verma@example.com",
+    "residentialStatus": "RESIDENT_INDIAN"
+  },
+  "employmentDetails": {
+    "employmentType": "SALARIED_PRIVATE",
+    "employerName": "Wipro Technologies",
+    "designation": "Project Lead",
+    "totalWorkExperienceMonths": 96,
+    "currentJobExperienceMonths": 36,
+    "grossMonthlyIncome": 180000,
+    "netMonthlyIncome": 140000,
+    "totalAnnualIncome": 2160000
+  },
+  "loanRequirement": {
+    "loanType": "PERSONAL_LOAN",
+    "requestedAmount": 750000,
+    "requestedTenureMonths": 48,
+    "purposeDescription": "Home renovation"
+  }
+}
+
+### DSA List Applications
+GET {{dsaService}}/applications?page=0&limit=20
+Authorization: Bearer {{dsaToken}}
+
+### DSA List Officers
+GET {{dsaService}}/officers
+Authorization: Bearer {{dsaToken}}
+
+### DSA Commissions Summary
+GET {{dsaService}}/commissions
+Authorization: Bearer {{dsaToken}}
+
+### DSA Commission History
+GET {{dsaService}}/commissions/history?page=0&limit=50
+Authorization: Bearer {{dsaToken}}
+
+### DSA Profile
+GET {{dsaService}}/profile
+Authorization: Bearer {{dsaToken}}
+
+###############################################################################
+# 12. ERROR HANDLING
+###############################################################################
+
+### 401 Unauthorized
+GET {{loanService}}/applications
+Authorization: Bearer invalid_token_here
+
+### 404 Not Found
+GET {{loanService}}/applications/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{accessToken}}
+
+### 409 Duplicate Application
+POST {{loanService}}/applications
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Idempotency-Key: {{$guid}}
+
+{
+  "loanType": "PERSONAL_LOAN",
+  "channelCode": "MOBILE_APP",
+  "applicant": {
+    "fullName": "Ravi Sharma",
+    "dob": "1990-04-21",
+    "mobile": "{{mobile}}",
+    "residentialStatus": "RESIDENT_INDIAN"
+  },
+  "employmentDetails": {
+    "employmentType": "SALARIED_PRIVATE",
+    "grossMonthlyIncome": 120000,
+    "netMonthlyIncome": 95000,
+    "totalAnnualIncome": 1440000
+  },
+  "loanRequirement": {
+    "loanType": "PERSONAL_LOAN",
+    "requestedAmount": 500000,
+    "requestedTenureMonths": 36
+  }
+}
+
+### 422 Validation Error
+POST {{loanService}}/applications
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "loanType": "INVALID_TYPE",
+  "channelCode": "MOBILE_APP",
+  "applicant": {
+    "fullName": "A",
+    "dob": "invalid-date",
+    "mobile": "123",
+    "residentialStatus": "RESIDENT_INDIAN"
+  },
+  "employmentDetails": {
+    "employmentType": "SALARIED_PRIVATE",
+    "grossMonthlyIncome": -1000,
+    "netMonthlyIncome": -500,
+    "totalAnnualIncome": -600
+  },
+  "loanRequirement": {
+    "loanType": "PERSONAL_LOAN",
+    "requestedAmount": 0,
+    "requestedTenureMonths": 0
+  }
+}

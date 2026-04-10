@@ -1,0 +1,64 @@
+name: LOS Platform Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (e.g., commit SHA)'
+        required: true
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+  IMAGE_TAG: ${{ inputs.image_tag }}
+
+jobs:
+  deploy-prod:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull production images
+        run: |
+          for svc in auth-service kyc-service loan-service decision-engine \
+                    integration-service notification-service dsa-service \
+                    document-service frontend; do
+            docker pull $ECR_REGISTRY/$svc:$IMAGE_TAG
+          done
+
+      - name: Deploy to Production EKS
+        run: |
+          aws eks update-kubeconfig --name los-prod-cluster --region ${{ env.AWS_REGION }}
+          for svc in auth-service kyc-service loan-service decision-engine \
+                    integration-service notification-service dsa-service document-service; do
+            echo "Updating $svc..."
+            kubectl set image deployment/$svc $svc=$ECR_REGISTRY/$svc:$IMAGE_TAG -n los-platform-prod
+          done
+          kubectl set image deployment/frontend frontend=$ECR_REGISTRY/frontend:$IMAGE_TAG -n los-platform-prod
+
+      - name: Wait for rollout
+        run: |
+          for deployment in auth-service kyc-service loan-service decision-engine \
+                           integration-service notification-service dsa-service \
+                           document-service frontend; do
+            echo "Waiting for $deployment..."
+            kubectl rollout status deployment/$deployment -n los-platform-prod --timeout=300s
+          done
+
+      - name: Verify pod health
+        run: |
+          kubectl get pods -n los-platform-prod
+          kubectl top pods -n los-platform-prod || true

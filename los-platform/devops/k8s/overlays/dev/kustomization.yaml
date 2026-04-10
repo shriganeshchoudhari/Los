@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: los-platform-dev
+
+resources:
+  - ../../base
+
+images:
+  - name: ${ECR_REGISTRY}/auth-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/loan-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/kyc-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/decision-engine
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/integration-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/notification-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/dsa-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/document-service
+    newTag: dev-latest
+  - name: ${ECR_REGISTRY}/frontend
+    newTag: dev-latest
+
+configMapGenerator:
+  - name: los-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=development
+
+secretGenerator:
+  - name: los-secrets
+    behavior: merge
+    literals:
+      - DB_PASSWORD=dev_password
+      - JWT_SECRET=dev_jwt_secret_minimum_32_characters
+
+patchesStrategicMerge:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+    target:
+      kind: Deployment

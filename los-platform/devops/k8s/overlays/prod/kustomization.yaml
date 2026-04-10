@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: los-platform-prod
+
+resources:
+  - ../../base
+
+images:
+  - name: ${ECR_REGISTRY}/auth-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/loan-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/kyc-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/decision-engine
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/integration-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/notification-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/dsa-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/document-service
+    newTag: prod-latest
+  - name: ${ECR_REGISTRY}/frontend
+    newTag: prod-latest
+
+configMapGenerator:
+  - name: los-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+
+patchesStrategicMerge:
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/serviceAccountName
+        value: los-service-prod
+    target:
+      kind: Deployment
