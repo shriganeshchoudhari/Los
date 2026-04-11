@@ -431,3 +431,63 @@ export class FoirCalculationResultDto {
   @ApiProperty()
   monthlyRateBps: number;
 }
+
+export class ManagerDecisionDto {
+  @ApiProperty({ enum: ['APPROVED', 'CONDITIONALLY_APPROVED', 'REJECTED'], description: 'Manager decision action' })
+  @IsEnum(['APPROVED', 'CONDITIONALLY_APPROVED', 'REJECTED'])
+  @IsNotEmpty()
+  action: 'APPROVED' | 'CONDITIONALLY_APPROVED' | 'REJECTED';
+
+  @ApiPropertyOptional({ description: 'Remarks for the decision (required for REJECTED and CONDITIONALLY_APPROVED)' })
+  @IsOptional()
+  @IsString()
+  @MinLength(10, { message: 'Remarks must be at least 10 characters' })
+  remarks?: string;
+
+  @ApiPropertyOptional({ description: 'Override sanctioned amount (only for APPROVED, must be ≤ requested amount)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  sanctionedAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Override interest rate in basis points (only for APPROVED)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  rateOfInterestBps?: number;
+
+  @ApiPropertyOptional({ description: 'Override tenure in months (only for APPROVED)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(360)
+  tenureMonths?: number;
+}
+
+export class InitiateCancellationDto {
+  @ApiProperty({ description: 'Reason for initiating cancellation (RBI DLG cooling-off)' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(10, { message: 'Cancellation reason must be at least 10 characters' })
+  reason: string;
+}
+
+export class CancellationStatusDto {
+  @ApiProperty()
+  inCancellationWindow: boolean;
+
+  @ApiPropertyOptional()
+  cancellationWindowInitiatedAt?: Date;
+
+  @ApiPropertyOptional()
+  cancellationWindowDeadline?: Date;
+
+  @ApiPropertyOptional()
+  daysRemaining?: number;
+
+  @ApiPropertyOptional()
+  hoursRemaining?: number;
+
+  @ApiPropertyOptional()
+  windowExpired?: boolean;
+}

@@ -49,8 +49,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { data } = await authApi.verifyOtp(sessionId, mobile, otp);
-      document.cookie = `access_token=${data.accessToken}; path=/; max-age=${data.expiresIn}; samesite=strict`;
-      document.cookie = `refresh_token=${data.refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict`;
+      await fetch('/api/auth/callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn ?? 900,
+        }),
+      });
       toast.success('Login successful!');
       router.push('/dashboard');
     } catch (err: unknown) {

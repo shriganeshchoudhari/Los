@@ -12,6 +12,12 @@ import { AuthService } from './services/auth.service';
 import { LdapService } from './services/ldap.service';
 import { User, OtpSession, RefreshToken } from './entities';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { JwtKeyManager } from './utils/jwt-key-manager';
+
+function jwtKeyManagerFactory(configService: ConfigService): JwtKeyManager {
+  const privateKeyPem = configService.get<string>('JWT_PRIVATE_KEY');
+  return new JwtKeyManager(privateKeyPem);
+}
 
 @Module({
   imports: [
@@ -20,15 +26,27 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const keyManager = jwtKeyManagerFactory(configService);
+        return {
+          publicKey: keyManager.getPublicKeyPem(),
+          verifyOptions: { algorithms: ['RS256'] },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
   controllers: [AuthController, HealthController, JwksController, MetricsController],
-  providers: [AuthService, LdapService, JwtStrategy],
-  exports: [AuthService, LdapService, JwtModule],
+  providers: [
+    AuthService,
+    LdapService,
+    JwtStrategy,
+    {
+      provide: JwtKeyManager,
+      useFactory: jwtKeyManagerFactory,
+      inject: [ConfigService],
+    },
+  ],
+  exports: [AuthService, LdapService],
 })
 export class AuthModule {}

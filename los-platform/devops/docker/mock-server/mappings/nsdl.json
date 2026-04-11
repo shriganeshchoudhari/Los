@@ -1,0 +1,74 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/tin/pan"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "100",
+        "message": "PAN verified successfully",
+        "result": {
+          "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+          "fullName": "{{jsonPath originalRequest body '$.fullName'}}",
+          "fatherName": "Father Name",
+          "dateOfBirth": "{{jsonPath originalRequest body '$.dob'}}",
+          "panStatus": "VALID",
+          "nameMatchScore": 95,
+          "aadhaarLinked": true,
+          "last4Aadhaar": "XXXX"
+        }
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/esign/initiate"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "200",
+        "esignTxnId": "esign-txn-{{randomValue length=16}}",
+        "message": "eSign OTP sent to registered mobile",
+        "consent": "Y",
+        "otpRefNumber": "OTP-REF-{{randomValue length=10}}",
+        "expiryMinutes": 15
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/esign/verify"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "200",
+        "esignTxnId": "{{jsonPath originalRequest body '$.esignTxnId'}}",
+        "message": "eSign completed successfully",
+        "documentHash": "mock_sha256_document_hash",
+        "signerName": "{{jsonPath originalRequest body '$.signerName'}}",
+        "signerAadhaar": "XXXX-XXXX-{{randomValue length=4}}",
+        "signatureBase64": "TVNUAQADAAAAAgAAAAA=",
+        "certificate": "MIIDXTCCAkWgAwIBAgIJA==",
+        "signedAt": "{{now format='yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

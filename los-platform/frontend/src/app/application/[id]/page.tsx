@@ -14,6 +14,7 @@ const STEPS = [
   { key: 'PERSONAL', label: 'Personal Details' },
   { key: 'EMPLOYMENT', label: 'Employment' },
   { key: 'LOAN', label: 'Loan Details' },
+  { key: 'COAPPLICANTS', label: 'Co-Applicants' },
   { key: 'REVIEW', label: 'Review & Submit' },
 ];
 
@@ -40,6 +41,23 @@ interface FormData {
   city: string;
   state: string;
   addressLine1: string;
+  productType: string;
+}
+
+interface CoApplicant {
+  name: string;
+  relationship: string;
+  pan: string;
+  aadhaar: string;
+  grossMonthlyIncome: number;
+}
+
+interface Guarantor {
+  name: string;
+  relationship: string;
+  pan: string;
+  aadhaar: string;
+  address: string;
 }
 
 export default function ApplicationFormPage() {
@@ -64,6 +82,16 @@ export default function ApplicationFormPage() {
   const watchAmount = watch('requestedAmount', 0);
   const watchTenure = watch('requestedTenureMonths', 36);
   const watchIncome = watch('grossMonthlyIncome', 0);
+  const watchProductType = watch('productType', '');
+
+  const REQUIRES_COAPPLICANTS = ['HOME_LOAN', 'LOAN_AGAINST_PROPERTY'].includes(watchProductType);
+
+  const [coApplicants, setCoApplicants] = useState<CoApplicant[]>([
+    { name: '', relationship: '', pan: '', aadhaar: '', grossMonthlyIncome: 0 },
+  ]);
+  const [guarantors, setGuarantors] = useState<Guarantor[]>([
+    { name: '', relationship: '', pan: '', aadhaar: '', address: '' },
+  ]);
 
   useEffect(() => {
     loadApplication();
@@ -94,10 +122,18 @@ export default function ApplicationFormPage() {
   };
 
   const nextStep = () => {
-    if (currentStep < STEPS.length - 1) setCurrentStep(s => s + 1);
+    let next = currentStep + 1;
+    while (next < STEPS.length && STEPS[next].key === 'COAPPLICANTS' && !REQUIRES_COAPPLICANTS) {
+      next++;
+    }
+    if (next < STEPS.length) setCurrentStep(next);
   };
   const prevStep = () => {
-    if (currentStep > 0) setCurrentStep(s => s - 1);
+    let prev = currentStep - 1;
+    while (prev >= 0 && STEPS[prev].key === 'COAPPLICANTS' && !REQUIRES_COAPPLICANTS) {
+      prev--;
+    }
+    if (prev >= 0) setCurrentStep(prev);
   };
 
   const onSubmit = async (data: FormData) => {
@@ -142,8 +178,19 @@ export default function ApplicationFormPage() {
           requestedAmount: data.requestedAmount,
           requestedTenureMonths: data.requestedTenureMonths,
           purposeDescription: data.purposeDescription,
+          productType: data.productType,
         },
       });
+
+      if (REQUIRES_COAPPLICANTS) {
+        await loanApi.update(id, {
+          section: 'COAPPLICANTS',
+          data: {
+            coApplicants: coApplicants.filter(c => c.name.trim()),
+            guarantors: guarantors.filter(g => g.name.trim()),
+          },
+        });
+      }
 
       await loanApi.submit(id);
       toast.success('Application submitted! Proceeding to KYC...');
@@ -343,6 +390,24 @@ export default function ApplicationFormPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div>
+                    <label className="label mb-1.5 block">Product Type *</label>
+                    <select {...register('productType')} className="input">
+                      <option value="">Select Product</option>
+                      <option value="PERSONAL_LOAN">Personal Loan</option>
+                      <option value="HOME_LOAN">Home Loan</option>
+                      <option value="LOAN_AGAINST_PROPERTY">Loan Against Property (LAP)</option>
+                      <option value="BUSINESS_LOAN">Business Loan</option>
+                      <option value="EDUCATION_LOAN">Education Loan</option>
+                      <option value="CAR_LOAN">Car Loan</option>
+                      <option value="BLENDED_LOAN">Blended Loan</option>
+                    </select>
+                    {REQUIRES_COAPPLICANTS && (
+                      <p className="text-xs text-orange-600 mt-1">
+                        ⚠ Home Loans and LAP require co-applicants and/or guarantors. This section will appear next.
+                      </p>
+                    )}
+                  </div>
+                  <div>
                     <div className="flex justify-between mb-2">
                       <label className="label">Loan Amount *</label>
                       <span className="font-mono font-bold text-lg">₹{watchAmount.toLocaleString('en-IN')}</span>
@@ -387,10 +452,237 @@ export default function ApplicationFormPage() {
               </Card>
             )}
 
-            {currentStep === 3 && (
+            {currentStep === 3 && REQUIRES_COAPPLICANTS && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Co-Applicants</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Home Loans and LAP require at least one co-applicant. You can add up to 3 co-applicants.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {coApplicants.map((ca, i) => (
+                      <div key={i} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <p className="font-medium text-sm">Co-Applicant {i + 1}</p>
+                          {i > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setCoApplicants(prev => prev.filter((_, j) => j !== i))}
+                              className="text-xs text-red-500 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label mb-1 block">Full Name</label>
+                            <Input
+                              value={ca.name}
+                              onChange={(e) => {
+                                const updated = [...coApplicants];
+                                updated[i].name = e.target.value;
+                                setCoApplicants(updated);
+                              }}
+                              placeholder="Co-applicant name as per PAN"
+                            />
+                          </div>
+                          <div>
+                            <label className="label mb-1 block">Relationship</label>
+                            <select
+                              value={ca.relationship}
+                              onChange={(e) => {
+                                const updated = [...coApplicants];
+                                updated[i].relationship = e.target.value;
+                                setCoApplicants(updated);
+                              }}
+                              className="input"
+                            >
+                              <option value="">Select</option>
+                              <option value="SPOUSE">Spouse</option>
+                              <option value="PARENT">Parent</option>
+                              <option value="SIBLING">Sibling</option>
+                              <option value="CHILD">Child</option>
+                              <option value="OTHER">Other</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label mb-1 block">PAN</label>
+                            <Input
+                              value={ca.pan}
+                              onChange={(e) => {
+                                const updated = [...coApplicants];
+                                updated[i].pan = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                                setCoApplicants(updated);
+                              }}
+                              placeholder="ABCDE1234F"
+                              maxLength={10}
+                              className="font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="label mb-1 block">Aadhaar (last 4 digits)</label>
+                            <Input
+                              value={ca.aadhaar}
+                              onChange={(e) => {
+                                const updated = [...coApplicants];
+                                updated[i].aadhaar = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setCoApplicants(updated);
+                              }}
+                              placeholder="XXXX"
+                              maxLength={4}
+                              className="font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="label mb-1 block">Gross Monthly Income</label>
+                          <MoneyInput
+                            value={ca.grossMonthlyIncome}
+                            onValueChange={(v) => {
+                              const updated = [...coApplicants];
+                              updated[i].grossMonthlyIncome = v;
+                              setCoApplicants(updated);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {coApplicants.length < 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCoApplicants(prev => [...prev, { name: '', relationship: '', pan: '', aadhaar: '', grossMonthlyIncome: 0 }])}
+                      >
+                        + Add Co-Applicant
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Guarantors</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Guarantors may be required for LAP. You can add up to 2 guarantors.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {guarantors.map((g, i) => (
+                      <div key={i} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <p className="font-medium text-sm">Guarantor {i + 1}</p>
+                          {i > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setGuarantors(prev => prev.filter((_, j) => j !== i))}
+                              className="text-xs text-red-500 hover:underline"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label mb-1 block">Full Name</label>
+                            <Input
+                              value={g.name}
+                              onChange={(e) => {
+                                const updated = [...guarantors];
+                                updated[i].name = e.target.value;
+                                setGuarantors(updated);
+                              }}
+                              placeholder="Guarantor name as per PAN"
+                            />
+                          </div>
+                          <div>
+                            <label className="label mb-1 block">Relationship</label>
+                            <select
+                              value={g.relationship}
+                              onChange={(e) => {
+                                const updated = [...guarantors];
+                                updated[i].relationship = e.target.value;
+                                setGuarantors(updated);
+                              }}
+                              className="input"
+                            >
+                              <option value="">Select</option>
+                              <option value="SPOUSE">Spouse</option>
+                              <option value="PARENT">Parent</option>
+                              <option value="SIBLING">Sibling</option>
+                              <option value="BUSINESS_PARTNER">Business Partner</option>
+                              <option value="OTHER">Other</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="label mb-1 block">PAN</label>
+                            <Input
+                              value={g.pan}
+                              onChange={(e) => {
+                                const updated = [...guarantors];
+                                updated[i].pan = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+                                setGuarantors(updated);
+                              }}
+                              placeholder="ABCDE1234F"
+                              maxLength={10}
+                              className="font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="label mb-1 block">Aadhaar (last 4 digits)</label>
+                            <Input
+                              value={g.aadhaar}
+                              onChange={(e) => {
+                                const updated = [...guarantors];
+                                updated[i].aadhaar = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setGuarantors(updated);
+                              }}
+                              placeholder="XXXX"
+                              maxLength={4}
+                              className="font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="label mb-1 block">Address</label>
+                          <Input
+                            value={g.address}
+                            onChange={(e) => {
+                              const updated = [...guarantors];
+                              updated[i].address = e.target.value;
+                              setGuarantors(updated);
+                            }}
+                            placeholder="Guarantor's current address"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {guarantors.length < 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGuarantors(prev => [...prev, { name: '', relationship: '', pan: '', aadhaar: '', address: '' }])}
+                      >
+                        + Add Guarantor
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {currentStep === 4 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Review & Submit</CardTitle>
+                  <CardTitle>Review &amp; Submit</CardTitle>
                   <p className="text-sm text-muted-foreground">Verify your details before submission</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -416,9 +708,29 @@ export default function ApplicationFormPage() {
                       <span className="text-sm font-bold">{formatCurrency(watchAmount)}</span>
                     </div>
                     <div className="flex justify-between py-2 px-3">
+                      <span className="text-sm text-muted-foreground">Product Type</span>
+                      <span className="text-sm font-medium">{watchProductType?.replace(/_/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between py-2 px-3">
                       <span className="text-sm text-muted-foreground">Tenure</span>
                       <span className="text-sm font-medium">{watchTenure} months</span>
                     </div>
+                    {REQUIRES_COAPPLICANTS && (
+                      <>
+                        <div className="flex justify-between py-2 px-3">
+                          <span className="text-sm text-muted-foreground">Co-Applicants</span>
+                          <span className="text-sm font-medium">
+                            {coApplicants.filter(c => c.name.trim()).length} added
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 px-3">
+                          <span className="text-sm text-muted-foreground">Guarantors</span>
+                          <span className="text-sm font-medium">
+                            {guarantors.filter(g => g.name.trim()).length} added
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
                     <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,0 +1,40 @@
+# Vault RBAC — service accounts for LOS services
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-secrets-reader
+  namespace: vault
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-secrets-reader-binding
+  namespace: vault
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+roleRef:
+  kind: Role
+  name: vault-secrets-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# Vault Policy — read-only for all LOS services
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-policy
+  namespace: vault
+type: Opaque
+stringData:
+  los-services-policy.hcl: |
+    path "secret/data/los/*" {
+      capabilities = ["read", "list"]
+    }
+    path "secret/metadata/los/*" {
+      capabilities = ["list"]
+    }

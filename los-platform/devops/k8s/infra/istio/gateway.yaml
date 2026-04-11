@@ -1,0 +1,29 @@
+# Istio Gateway for LOS Platform ingress
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: los-platform-gateway
+  namespace: los-platform
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*.los-platform.example.com"
+        - "los-platform.example.com"
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - "*.los-platform.example.com"
+        - "los-platform.example.com"
+      tls:
+        mode: SIMPLE
+        credentialName: los-platform-tls-cert

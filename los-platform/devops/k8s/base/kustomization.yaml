@@ -8,6 +8,7 @@ commonLabels:
   managed-by: kustomize
 
 resources:
+  - namespace.yaml
   - common.yaml
   - auth-service.yaml
   - loan-service.yaml
@@ -22,12 +23,16 @@ resources:
   - prometheus-rules/los-slos.yaml
   - grafana-datasources/datasources.yaml
   - promtail-config.yaml
+  - ../infra/vault/vault.yaml
+  - ../infra/vault/vault-rbac.yaml
+  - ../infra/vault/external-secrets.yaml
 
 configMapGenerator:
   - name: los-config
     literals:
       - ENVIRONMENT=development
       - LOG_LEVEL=info
+      - ECR_REGISTRY=123456789.dkr.ecr.ap-south-1.amazonaws.com
 
 vars:
   - name: ECR_REGISTRY

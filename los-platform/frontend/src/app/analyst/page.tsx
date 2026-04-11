@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/components';
 import { formatCurrency } from '@/lib/utils';
-import { loanApi, bureauApi } from '@/lib/api';
+import { loanApi, bureauApi, documentApi } from '@/lib/api';
 
 export default function CreditAnalystPage() {
   const [activeTab, setActiveTab] = useState<'UNDERWRITING' | 'DOCUMENTS' | 'BUREAU'>('UNDERWRITING');
@@ -12,6 +12,8 @@ export default function CreditAnalystPage() {
   const [loading, setLoading] = useState(true);
   const [bureauReports, setBureauReports] = useState<any[]>([]);
   const [bureauLoading, setBureauLoading] = useState(false);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
   const selected = applications.find(a => a.id === selectedId);
 
@@ -47,8 +49,26 @@ export default function CreditAnalystPage() {
     }
   }, [selectedId, activeTab, fetchBureauReports]);
 
+  const fetchDocuments = useCallback(async (applicationId: string) => {
+    setDocsLoading(true);
+    try {
+      const res = await documentApi.list(applicationId);
+      setDocuments(res.data?.documents || res.data?.data || res.data || []);
+    } catch {
+      setDocuments([]);
+    } finally {
+      setDocsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedId && activeTab === 'DOCUMENTS') {
+      fetchDocuments(selectedId);
+    }
+  }, [selectedId, activeTab, fetchDocuments]);
+
   const foir = selected
-    ? Math.round(((selected.existingEMI || 0) / (selected.grossMonthlyIncome || 1) * 100)
+    ? Math.round(((selected.existingEMI || 0) / (selected.grossMonthlyIncome || 1)) * 100)
     : 0;
 
   return (
@@ -201,22 +221,49 @@ export default function CreditAnalystPage() {
 
                   {activeTab === 'DOCUMENTS' && (
                     <div role="tabpanel" id="panel-documents" aria-labelledby="tab-documents">
-                      <Card>
-                      <CardHeader><CardTitle className="text-base">Document Checklist</CardTitle></CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                          Document checklist loading... (connect to document API)
-                        </p>
-                      </CardContent>
-                    </Card>
+                      {docsLoading ? (
+                        <div className="text-center py-8 text-sm text-muted-foreground">Loading documents...</div>
+                      ) : selectedId ? (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">Document Checklist</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            {documents.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">No documents found for this application.</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {documents.map((doc: any) => (
+                                  <div key={doc.id} className="flex items-center justify-between border rounded-lg px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-2 h-2 rounded-full ${doc.status === 'APPROVED' ? 'bg-green-500' : doc.status === 'REJECTED' ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                                      <div>
+                                        <p className="font-medium text-sm">{doc.documentType || doc.type}</p>
+                                        <p className="text-xs text-muted-foreground">{doc.fileName || doc.name || '—'}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <StatusBadge status={doc.status || 'PENDING'} />
+                                      {doc.uploadedAt && (
+                                        <span className="text-xs text-muted-foreground">{new Date(doc.uploadedAt).toLocaleDateString('en-IN')}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="text-center py-8 text-sm text-muted-foreground">Select an application to view documents.</div>
+                      )}
                     </div>
                   )}
 
                   {activeTab === 'BUREAU' && (
                     <div role="tabpanel" id="panel-bureau" aria-labelledby="tab-bureau">
                       <Card>
-                    <Card>
-                      <CardHeader>
+                        <CardHeader>
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">Bureau Reports</CardTitle>
                           <button
@@ -256,8 +303,8 @@ export default function CreditAnalystPage() {
                         )}
                       </CardContent>
                     </Card>
-                    </div>
-                  )}
+                  </div>
+                )}
                 </div>
 
                 <div className="space-y-4">

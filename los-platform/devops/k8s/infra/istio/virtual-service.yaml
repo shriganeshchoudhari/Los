@@ -1,0 +1,104 @@
+# Istio VirtualService for LOS Platform services
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: los-platform
+  namespace: los-platform
+spec:
+  hosts:
+    - "los-platform.example.com"
+  gateways:
+    - istio-system/los-platform-gateway
+  http:
+    - match:
+        - uri:
+            prefix: "/auth"
+        - uri:
+            prefix: "/api/auth"
+      route:
+        - destination:
+            host: auth-service
+            port:
+              number: 3001
+    - match:
+        - uri:
+            prefix: "/kyc"
+        - uri:
+            prefix: "/api/kyc"
+      route:
+        - destination:
+            host: kyc-service
+            port:
+              number: 3002
+    - match:
+        - uri:
+            prefix: "/applications"
+        - uri:
+            prefix: "/loan-agreement"
+        - uri:
+            prefix: "/sanction-letter"
+        - uri:
+            prefix: "/audit-logs"
+        - uri:
+            prefix: "/api/loan"
+      route:
+        - destination:
+            host: loan-service
+            port:
+              number: 3003
+    - match:
+        - uri:
+            prefix: "/documents"
+        - uri:
+            prefix: "/api/documents"
+      route:
+        - destination:
+            host: document-service
+            port:
+              number: 3009
+    - match:
+        - uri:
+            prefix: "/decisions"
+        - uri:
+            prefix: "/api/decisions"
+      route:
+        - destination:
+            host: decision-engine
+            port:
+              number: 3004
+    - match:
+        - uri:
+            prefix: "/integration"
+        - uri:
+            prefix: "/api/integration"
+      route:
+        - destination:
+            host: integration-service
+            port:
+              number: 3006
+    - match:
+        - uri:
+            prefix: "/notifications"
+        - uri:
+            prefix: "/api/notifications"
+      route:
+        - destination:
+            host: notification-service
+            port:
+              number: 3007
+    - match:
+        - uri:
+            prefix: "/dsa"
+      route:
+        - destination:
+            host: dsa-service
+            port:
+              number: 3008
+    - match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: frontend
+            port:
+              number: 3000

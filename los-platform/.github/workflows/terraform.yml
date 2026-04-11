@@ -1,0 +1,279 @@
+name: Terraform Infrastructure
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'devops/terraform/**'
+      - 'devops/k8s/infra/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'devops/terraform/**'
+      - 'devops/k8s/infra/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment (dev/uat/prod/dr)'
+        required: true
+        default: 'dev'
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: 1.7.5
+  AWS_REGION: ap-south-1
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      plan_changed: ${{ steps.plan.outputs.plan_changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform backend
+        run: |
+          cat > backend.tf << 'BACKEND'
+          terraform {
+            backend "s3" {
+              bucket = "los-terraform-state-${{ github.event.inputs.environment || 'dev' }}"
+              key    = "${{ github.event.inputs.environment || 'dev' }}/terraform.tfstate"
+              region = "${{ env.AWS_REGION }}"
+              dynamodb_table = "los-terraform-state-locks"
+              encrypt = true
+            }
+          }
+          BACKEND
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -get-plugins=true \
+            -plugin-dir=~/.terraform.d/plugin-cache \
+            || terraform init
+        working-directory: devops/terraform
+
+      - name: Terraform Format Check
+        id: fmt
+        run: |
+          terraform fmt -check -recursive -diff
+        working-directory: devops/terraform
+        continue-on-error: true
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+        working-directory: devops/terraform
+
+      - name: Select var file
+        id: varfile
+        run: |
+          ENV=${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'dev') }}
+          echo "var_file=environments/${ENV}.tfvars" >> $GITHUB_OUTPUT
+        working-directory: devops/terraform
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var-file=${{ steps.varfile.outputs.var_file }} \
+            -out=tfplan \
+            -detailed-exitcode
+        working-directory: devops/terraform
+        continue-on-error: true
+
+      - name: Plan output
+        id: plan_output
+        run: |
+          if terraform show tfplan 2>/dev/null | grep -q 'No changes.'; then
+            echo "plan_changed=false" >> $GITHUB_OUTPUT
+            echo "plan_summary=No infrastructure changes needed" >> $GITHUB_OUTPUT
+          else
+            echo "plan_changed=true" >> $GITHUB_OUTPUT
+            SUMMARY=$(terraform show tfplan -no-color 2>/dev/null | tail -20)
+            echo "plan_summary=${SUMMARY//$'\n'/\\n}" >> $GITHUB_OUTPUT
+          fi
+        working-directory: devops/terraform
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `### Terraform Plan\n\`${{ steps.varfile.outputs.var_file }}\`\n\n**Changed:** ${{ steps.plan_output.outputs.plan_changed }}\n\n\`\`\`\n${process.env.PLAN_SUMMARY || '${{ steps.plan_output.outputs.plan_summary }}'}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+        env:
+          PLAN_SUMMARY: ${{ steps.plan_output.outputs.plan_summary }}
+
+      - name: Fail if plan has changes on non-target branch
+        if: steps.plan.outputs.exitcode == 2 && github.event_name != 'workflow_dispatch'
+        run: exit 1
+
+  terraform-apply:
+    name: Terraform Apply (${{ github.event.inputs.environment || 'dev' }})
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      needs.terraform-plan.outputs.plan_changed == 'true'
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: devops/terraform
+
+      - name: Select var file
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+          echo "var_file=environments/${ENV}.tfvars" >> $GITHUB_OUTPUT
+        working-directory: devops/terraform
+
+      - name: Terraform Apply
+        run: terraform apply -var-file=${{ steps.varfile.outputs.var_file }} -auto-approve tfplan
+        working-directory: devops/terraform
+
+      - name: Terraform Apply Drift Detection
+        if: github.ref == 'refs/heads/main'
+        run: |
+          terraform plan -var-file=${{ steps.varfile.outputs.var_file }} -detailed-exitcode
+          if [ $? -eq 2 ]; then
+            echo "INFRASTRUCTURE DRIFT DETECTED — manual intervention required"
+            exit 1
+          fi
+        working-directory: devops/terraform
+
+  k8s-gitops-bootstrap:
+    name: K8s GitOps Bootstrap
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    if: github.event_name == 'workflow_dispatch'
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name los-${{ github.event.inputs.environment || 'dev' }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Install ArgoCD
+        run: |
+          kubectl create namespace argocd || true
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.10.0/manifests/install.yaml
+          kubectl rollout status deployment argocd-server -n argocd --timeout=120s
+
+      - name: Install External Secrets Operator
+        run: |
+          kubectl create namespace external-secrets || true
+          kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-secrets/v0.9.16/deploy/external-secrets.yaml
+          kubectl rollout status deployment external-secrets-webhook -n external-secrets --timeout=120s
+
+      - name: Install kube-prometheus-stack
+        run: |
+          kubectl create namespace observability || true
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+            --namespace observability \
+            --values devops/k8s/infra/monitoring/prometheus-rules.yaml \
+            --wait --timeout 5m || true
+
+      - name: Deploy ArgoCD Application
+        env:
+          ENV: ${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          sed "s/los-platform-dev/los-platform-${ENV}/g" devops/k8s/infra/argocd/los-platform-app.yaml | kubectl apply -f -
+          sed "s/los-platform-dev/los-platform-${ENV}/g" devops/k8s/infra/argocd/los-platform-project.yaml | kubectl apply -f -
+
+      - name: Sync ArgoCD Applications
+        run: |
+          argocd_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+          argocd login argocd-server-argocd.apps.internal --username admin --password $argocd_password --insecure || true
+          argocd app sync los-platform --force --timeout 300 || true
+
+  drift-check:
+    name: Weekly Drift Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' && github.event.cron == '0 6 * * 1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init & Plan
+        run: |
+          terraform init
+          terraform plan -detailed-exitcode -var-file=environments/dev.tfvars
+        working-directory: devops/terraform
+
+      - name: Notify on drift
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'infrastructure-drift-detected',
+              client_payload: { branch: 'main' }
+            })

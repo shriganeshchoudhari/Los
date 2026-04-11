@@ -18,6 +18,7 @@ import {
   UpdateApplicationDto,
   AutoSaveDto,
   ApplicationResponseDto,
+  ManagerDecisionDto,
   ApplicationSummaryDto,
   FoirCalculationResultDto,
 } from '../dto';
@@ -56,12 +57,13 @@ const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   [ApplicationStatus.PENDING_LEGAL_TECHNICAL]: [ApplicationStatus.LEGAL_TECHNICAL_DONE],
   [ApplicationStatus.LEGAL_TECHNICAL_DONE]: [ApplicationStatus.APPROVED, ApplicationStatus.CONDITIONALLY_APPROVED, ApplicationStatus.REJECTED],
   [ApplicationStatus.CREDIT_COMMITTEE]: [ApplicationStatus.APPROVED, ApplicationStatus.CONDITIONALLY_APPROVED, ApplicationStatus.REJECTED],
-  [ApplicationStatus.APPROVED]: [ApplicationStatus.SANCTIONED, ApplicationStatus.CANCELLED],
-  [ApplicationStatus.CONDITIONALLY_APPROVED]: [ApplicationStatus.SANCTIONED, ApplicationStatus.CANCELLED],
+  [ApplicationStatus.APPROVED]: [ApplicationStatus.SANCTIONED, ApplicationStatus.CANCELLED, ApplicationStatus.CANCELLATION_WINDOW],
+  [ApplicationStatus.CONDITIONALLY_APPROVED]: [ApplicationStatus.SANCTIONED, ApplicationStatus.CANCELLED, ApplicationStatus.CANCELLATION_WINDOW],
   [ApplicationStatus.REJECTED]: [],
   [ApplicationStatus.WITHDRAWN]: [],
   [ApplicationStatus.CANCELLED]: [],
-  [ApplicationStatus.SANCTIONED]: [ApplicationStatus.DISBURSEMENT_IN_PROGRESS],
+  [ApplicationStatus.CANCELLATION_WINDOW]: [ApplicationStatus.CANCELLED],
+  [ApplicationStatus.SANCTIONED]: [ApplicationStatus.DISBURSEMENT_IN_PROGRESS, ApplicationStatus.CANCELLATION_WINDOW],
   [ApplicationStatus.DISBURSEMENT_IN_PROGRESS]: [ApplicationStatus.DISBURSED],
   [ApplicationStatus.DISBURSED]: [ApplicationStatus.CLOSED],
   [ApplicationStatus.CLOSED]: [],
@@ -789,5 +791,263 @@ export class LoanApplicationService {
     } catch (error) {
       this.logger.error(`Failed to publish event to ${topic}`, { error: error.message });
     }
+  }
+
+  async submitManagerDecision(
+    applicationId: string,
+    dto: ManagerDecisionDto,
+    userId: string,
+    userRole: string,
+  ): Promise<LoanApplication> {
+    const application = await this.applicationRepository.findOne({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw createError('APP_001', 'Application not found');
+    }
+
+    const REVIEWABLE_STATUSES: ApplicationStatus[] = [
+      ApplicationStatus.CREDIT_ASSESSMENT,
+      ApplicationStatus.PENDING_FIELD_INVESTIGATION,
+      ApplicationStatus.PENDING_LEGAL_TECHNICAL,
+      ApplicationStatus.FIELD_INVESTIGATION_DONE,
+      ApplicationStatus.LEGAL_TECHNICAL_DONE,
+      ApplicationStatus.CREDIT_COMMITTEE,
+    ];
+
+    if (!REVIEWABLE_STATUSES.includes(application.status)) {
+      throw createError('APP_004', `Application is not in a reviewable state. Current status: ${application.status}`);
+    }
+
+    const AUTHORITY_LIMITS: Record<string, number> = {
+      BRANCH_MANAGER: 50_00_000,
+      ZONAL_CREDIT_HEAD: 2_00_00_000,
+      CREDIT_HEAD: 10_00_00_000,
+    };
+    const limit = AUTHORITY_LIMITS[userRole] || 0;
+    if (application.requestedAmount > limit) {
+      throw createError('AUTH_006', `Insufficient authority. Your limit is ₹${limit.toLocaleString('en-IN')} but requested amount is ₹${application.requestedAmount.toLocaleString('en-IN')}`);
+    }
+
+    const targetStatus = dto.action;
+    const validTransitions = VALID_TRANSITIONS[application.status];
+    if (!validTransitions.includes(targetStatus)) {
+      throw createError('APP_004', `Cannot ${dto.action} from status ${application.status}`);
+    }
+
+    if ((dto.action === 'REJECTED' || dto.action === 'CONDITIONALLY_APPROVED') && !dto.remarks) {
+      throw createError('APP_004', 'Remarks are required for REJECTED and CONDITIONALLY_APPROVED decisions');
+    }
+
+    if (dto.sanctionedAmount && dto.sanctionedAmount > application.requestedAmount) {
+      throw createError('APP_004', `Sanctioned amount (₹${dto.sanctionedAmount.toLocaleString('en-IN')}) cannot exceed requested amount (₹${application.requestedAmount.toLocaleString('en-IN')})`);
+    }
+
+    const previousStatus = application.status;
+    application.status = targetStatus;
+
+    if (dto.sanctionedAmount !== undefined) {
+      application.sanctionedAmount = dto.sanctionedAmount;
+    }
+    if (dto.tenureMonths !== undefined) {
+      application.sanctionedTenureMonths = dto.tenureMonths;
+    }
+    if (dto.rateOfInterestBps !== undefined) {
+      application.sanctionedRoiBps = dto.rateOfInterestBps;
+    }
+
+    if (dto.action === 'REJECTED') {
+      application.rejectionRemarks = dto.remarks;
+    } else {
+      application.sanctionedAt = new Date();
+    }
+
+    await this.applicationRepository.save(application);
+    await this.recordStageChange(applicationId, previousStatus, targetStatus, userId, userRole, dto.remarks);
+
+    await this.auditService.log({
+      eventCategory: AuditEventCategory.APPLICATION,
+      eventType: AuditEventType.STATUS_CHANGE,
+      entityType: 'LoanApplication',
+      entityId: application.id,
+      actorId: userId,
+      actorRole: userRole,
+      beforeState: JSON.stringify({ status: previousStatus }),
+      afterState: JSON.stringify({ status: targetStatus, sanctionedAmount: application.sanctionedAmount }),
+      metadata: {
+        applicationNumber: application.applicationNumber,
+        decision: dto.action,
+        remarks: dto.remarks,
+        sanctionedAmount: application.sanctionedAmount,
+        sanctionedRoiBps: application.sanctionedRoiBps,
+        sanctionedTenureMonths: application.sanctionedTenureMonths,
+      },
+    });
+
+    await this.publishEvent('los.application.manager_decision', {
+      applicationId,
+      applicationNumber: application.applicationNumber,
+      previousStatus,
+      newStatus: targetStatus,
+      decision: dto.action,
+      sanctionedAmount: application.sanctionedAmount,
+      sanctionedRoiBps: application.sanctionedRoiBps,
+      sanctionedTenureMonths: application.sanctionedTenureMonths,
+      decidedBy: userId,
+      decidedByRole: userRole,
+      remarks: dto.remarks,
+    });
+
+    this.logger.log(`Manager decision: ${application.applicationNumber} -> ${targetStatus} by ${userRole} ${userId}`);
+
+    return application;
+  }
+
+  async initiateCancellationWindow(
+    applicationId: string,
+    reason: string,
+    userId: string,
+    userRole: string,
+  ): Promise<LoanApplication> {
+    const application = await this.applicationRepository.findOne({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw createError('APP_001', 'Application not found');
+    }
+
+    if (application.requestedAmount > 50_000) {
+      throw createError(
+        'APP_004',
+        'Cooling-off window is only available for loans ≤ ₹50,000 as per RBI Digital Lending Guidelines',
+      );
+    }
+
+    const ALLOWABLE_CANCELLATION_STATUSES: ApplicationStatus[] = [
+      ApplicationStatus.SANCTIONED,
+      ApplicationStatus.APPROVED,
+      ApplicationStatus.CONDITIONALLY_APPROVED,
+    ];
+
+    if (!ALLOWABLE_CANCELLATION_STATUSES.includes(application.status)) {
+      throw createError(
+        'APP_004',
+        `Cannot initiate cooling-off cancellation from status ${application.status}. Only SANCTIONED, APPROVED, or CONDITIONALLY_APPROVED applications are eligible.`,
+      );
+    }
+
+    if (application.status === ApplicationStatus.SANCTIONED && application.disbursedAt) {
+      throw createError('APP_004', 'Cannot cancel — disbursement has already been completed');
+    }
+
+    const now = new Date();
+    const deadline = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+
+    const previousStatus = application.status;
+    application.status = ApplicationStatus.CANCELLATION_WINDOW;
+    application.cancellationWindowInitiatedAt = now;
+    application.cancellationWindowDeadline = deadline;
+    application.cancellationReason = reason;
+    application.cancellationByUserId = userId;
+    application.cancellationByRole = userRole;
+
+    await this.applicationRepository.save(application);
+    await this.recordStageChange(applicationId, previousStatus, ApplicationStatus.CANCELLATION_WINDOW, userId, userRole, reason);
+
+    await this.auditService.log({
+      eventCategory: AuditEventCategory.APPLICATION,
+      eventType: AuditEventType.STATUS_CHANGE,
+      entityType: 'LoanApplication',
+      entityId: application.id,
+      actorId: userId,
+      actorRole: userRole,
+      beforeState: JSON.stringify({ status: previousStatus }),
+      afterState: JSON.stringify({ status: ApplicationStatus.CANCELLATION_WINDOW, cancellationDeadline: deadline.toISOString() }),
+      metadata: { applicationNumber: application.applicationNumber, cancellationReason: reason, coolingOffDays: 3 },
+    });
+
+    await this.publishEvent('los.application.cancellation_initiated', {
+      applicationId,
+      applicationNumber: application.applicationNumber,
+      previousStatus,
+      cancellationDeadline: deadline.toISOString(),
+      initiatedBy: userId,
+      initiatedByRole: userRole,
+      reason,
+    });
+
+    this.logger.log(
+      `Cooling-off initiated: ${application.applicationNumber} by ${userRole} ${userId}. Deadline: ${deadline.toISOString()}`,
+    );
+
+    return application;
+  }
+
+  async confirmCancellation(applicationId: string, userId: string): Promise<LoanApplication> {
+    const application = await this.applicationRepository.findOne({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw createError('APP_001', 'Application not found');
+    }
+
+    if (application.status !== ApplicationStatus.CANCELLATION_WINDOW) {
+      throw createError('APP_004', `Cannot confirm cancellation — application is in ${application.status} status`);
+    }
+
+    if (!application.cancellationWindowDeadline) {
+      throw createError('APP_004', 'Cancellation window deadline not set');
+    }
+
+    const now = new Date();
+    if (now > application.cancellationWindowDeadline) {
+      throw createError('APP_004', 'Cooling-off cancellation window has expired. Application proceeds to disbursement.');
+    }
+
+    const previousStatus = application.status;
+    application.status = ApplicationStatus.CANCELLED;
+
+    await this.applicationRepository.save(application);
+    await this.recordStageChange(
+      applicationId,
+      previousStatus,
+      ApplicationStatus.CANCELLED,
+      userId,
+      'APPLICANT',
+      `Cooling-off cancellation confirmed. Reason: ${application.cancellationReason}`,
+    );
+
+    await this.auditService.log({
+      eventCategory: AuditEventCategory.APPLICATION,
+      eventType: AuditEventType.STATUS_CHANGE,
+      entityType: 'LoanApplication',
+      entityId: application.id,
+      actorId: userId,
+      actorRole: 'APPLICANT',
+      beforeState: JSON.stringify({ status: previousStatus }),
+      afterState: JSON.stringify({ status: ApplicationStatus.CANCELLED }),
+      metadata: {
+        applicationNumber: application.applicationNumber,
+        cancellationReason: application.cancellationReason,
+        windowInitiatedAt: application.cancellationWindowInitiatedAt?.toISOString(),
+        confirmedAt: now.toISOString(),
+      },
+    });
+
+    await this.publishEvent('los.application.cancelled', {
+      applicationId,
+      applicationNumber: application.applicationNumber,
+      cancelledBy: userId,
+      cancelledByRole: 'APPLICANT',
+      cancellationReason: application.cancellationReason,
+      coolingOffWindow: true,
+    });
+
+    this.logger.log(`Cooling-off cancellation confirmed: ${application.applicationNumber} by ${userId}`);
+
+    return application;
   }
 }

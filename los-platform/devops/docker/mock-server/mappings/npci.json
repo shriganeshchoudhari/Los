@@ -1,0 +1,117 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/npci/nach/mandate"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "MDS-000",
+        "message": "NACH mandate registration initiated",
+        "mandateId": "NACH-MOCK-{{randomValue length=12}}",
+        "umrn": "UMRN-MOCK-{{randomValue length=15}}",
+        "registrationDate": "{{now format='yyyy-MM-dd'}}",
+        "status": "PENDING",
+        "bankReference": "NPCI-REF-{{randomValue length=10}}",
+        "expiryDate": "{{now offset='+5 years' format='yyyy-MM-dd'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/npci/nach/mandate/confirm"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "MDS-000",
+        "message": "NACH mandate registered and activated",
+        "umrn": "{{jsonPath originalRequest body '$.umrn'}}",
+        "status": "ACTIVE",
+        "activatedDate": "{{now format='yyyy-MM-dd'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/npci/imps/transfer"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "MDS-000",
+        "message": "IMPS transfer initiated",
+        "referenceNumber": "IMPS-MOCK-{{randomValue length=12}}",
+        "utrNumber": "UTR{{randomValue length=12 numeric='true'}}",
+        "amount": "{{jsonPath originalRequest body '$.amount'}}",
+        "beneficiaryName": "{{jsonPath originalRequest body '$.beneficiaryName'}}",
+        "beneficiaryAccount": "{{jsonPath originalRequest body '$.accountNumber'}}",
+        "senderAccount": "{{jsonPath originalRequest body '$.senderAccount'}}",
+        "transactionDate": "{{now format='yyyy-MM-dd HH:mm:ss'}}",
+        "status": "SUCCESS",
+        "bankResponse": "Transaction successful"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/npci/imps/penny-drop"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "MDS-000",
+        "message": "Penny drop verification successful",
+        "referenceNumber": "PD-MOCK-{{randomValue length=10}}",
+        "accountNumber": "{{jsonPath originalRequest body '$.accountNumber'}}",
+        "ifscCode": "{{jsonPath originalRequest body '$.ifscCode'}}",
+        "accountHolderName": "{{jsonPath originalRequest body '$.accountHolderName'}}",
+        "nameMatch": true,
+        "matchScore": 100,
+        "verificationDate": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/npci/upi/collect"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "MDS-000",
+        "message": "UPI collect request sent",
+        "referenceNumber": "UPI-MOCK-{{randomValue length=12}}",
+        "amount": "{{jsonPath originalRequest body '$.amount'}}",
+        "vpa": "{{jsonPath originalRequest body '$.vpa'}}",
+        "status": "SUCCESS",
+        "payerVpa": "success@vpa.mockbank"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

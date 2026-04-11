@@ -1,0 +1,91 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/cbs/customer/create"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "CBS-000",
+        "message": "Customer created in CBS",
+        "customerId": "CUST-MOCK-{{randomValue length=10}}",
+        "customerName": "{{jsonPath originalRequest body '$.customerName'}}",
+        "mobileNumber": "{{jsonPath originalRequest body '$.mobileNumber'}}",
+        "accountType": "{{jsonPath originalRequest body '$.accountType'}}",
+        "customerSince": "{{now format='yyyy-MM-dd'}}",
+        "cbsReference": "CBS-REF-{{randomValue length=12}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/cbs/loan/create"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "CBS-000",
+        "message": "Loan account created in CBS",
+        "loanAccountNumber": "LA-MOCK-{{randomValue length=12}}",
+        "customerId": "{{jsonPath originalRequest body '$.customerId'}}",
+        "sanctionedAmount": "{{jsonPath originalRequest body '$.sanctionedAmount'}}",
+        "roiBps": "{{jsonPath originalRequest body '$.roiBps'}}",
+        "tenureMonths": "{{jsonPath originalRequest body '$.tenureMonths'}}",
+        "accountStatus": "ACTIVE",
+        "cbsReference": "CBS-REF-{{randomValue length=12}}",
+        "createdAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/cbs/account/inquire"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "CBS-000",
+        "accountNumber": "{{jsonPath originalRequest body '$.accountNumber'}}",
+        "accountHolderName": "{{jsonPath originalRequest body '$.accountHolderName'}}",
+        "accountStatus": "ACTIVE",
+        "accountBalance": 50000.00,
+        "ifsCode": "{{jsonPath originalRequest body '$.ifscCode'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/cbs/account/verify-penny"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "CBS-000",
+        "accountNumber": "{{jsonPath originalRequest body '$.accountNumber'}}",
+        "accountHolderName": "{{jsonPath originalRequest body '$.accountHolderName'}}",
+        "nameMatch": true,
+        "verificationDate": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

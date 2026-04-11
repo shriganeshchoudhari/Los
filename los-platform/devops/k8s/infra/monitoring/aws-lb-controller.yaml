@@ -1,0 +1,90 @@
+# AWS Load Balancer Controller — provisions ALBs for Istio ingress
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aws-lb-controller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-load-balancer-controller
+  namespace: aws-lb-controller
+  annotations:
+    eks.amazonaws.com/role-arn: ${AWS_LB_CONTROLLER_ROLE_ARN}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aws-load-balancer-controller
+rules:
+  - apiGroups: ["elbv2.k8s.aws"]
+    resources: ["targetgroupbindings"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: ["elbv2.k8s.aws"]
+    resources: ["targetgroupbindings/status"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "delete", "get", "list", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aws-load-balancer-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aws-load-balancer-controller
+subjects:
+  - kind: ServiceAccount
+    name: aws-load-balancer-controller
+    namespace: aws-lb-controller
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-load-balancer-controller
+  namespace: aws-lb-controller
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aws-load-balancer-controller
+  template:
+    metadata:
+      labels:
+        app: aws-load-balancer-controller
+    spec:
+      serviceAccountName: aws-load-balancer-controller
+      containers:
+        - name: controller
+          image: public.ecr.aws/eks/aws-load-balancer-controller:v2.6.0
+          args:
+            - --cluster-name=${EKS_CLUSTER_NAME}
+            - --ingress-class=istio
+            - --enable-shield=false
+            - --enable-waf=false
+            - --enable-wafv2=false
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: webhook
+              containerPort: 9443
+              protocol: TCP
+          env:
+            - name: AWS_REGION
+              value: ap-south-1

@@ -195,7 +195,9 @@ jobs:
         run: |
           cd devops/k8s/overlays/dev
           kustomize edit set image ${ECR_REGISTRY}/auth-service=${ECR_REGISTRY}/auth-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/kyc-service=${ECR_REGISTRY}/kyc-service:dev-latest
           kustomize edit set image ${ECR_REGISTRY}/loan-service=${ECR_REGISTRY}/loan-service:dev-latest
+          kustomize edit set image ${ECR_REGISTRY}/decision-engine=${ECR_REGISTRY}/decision-engine:dev-latest
           kustomize edit set image ${ECR_REGISTRY}/integration-service=${ECR_REGISTRY}/integration-service:dev-latest
           kustomize edit set image ${ECR_REGISTRY}/notification-service=${ECR_REGISTRY}/notification-service:dev-latest
           kustomize edit set image ${ECR_REGISTRY}/dsa-service=${ECR_REGISTRY}/dsa-service:dev-latest
@@ -298,7 +300,9 @@ jobs:
         run: |
           cd devops/k8s/overlays/uat
           kustomize edit set image ${ECR_REGISTRY}/auth-service=${ECR_REGISTRY}/auth-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/kyc-service=${ECR_REGISTRY}/kyc-service:uat-latest
           kustomize edit set image ${ECR_REGISTRY}/loan-service=${ECR_REGISTRY}/loan-service:uat-latest
+          kustomize edit set image ${ECR_REGISTRY}/decision-engine=${ECR_REGISTRY}/decision-engine:uat-latest
           kustomize edit set image ${ECR_REGISTRY}/integration-service=${ECR_REGISTRY}/integration-service:uat-latest
           kustomize edit set image ${ECR_REGISTRY}/notification-service=${ECR_REGISTRY}/notification-service:uat-latest
           kustomize edit set image ${ECR_REGISTRY}/dsa-service=${ECR_REGISTRY}/dsa-service:uat-latest
@@ -310,11 +314,49 @@ jobs:
   database-migration:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    needs: [build-docker]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.UAT_DB_PASSWORD }}
+          POSTGRES_USER: ${{ secrets.UAT_DB_USER }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run database migrations
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create databases
         run: |
-          echo "Running migrations against UAT database..."
-          # Migration command would go here
-          # npm run migrate -- --connection-url=${{ secrets.UAT_DB_URL }}
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_auth;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_loan;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_kyc;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_decision;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_integration;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_document;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_notification;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_dsa;"
+          PGPASSWORD=${{ secrets.UAT_DB_PASSWORD }} psql -h localhost -U ${{ secrets.UAT_DB_USER }} -c "CREATE DATABASE los_shared;"
+
+      - name: Install ts-node
+        run: npm install -g ts-node
+
+      - name: Run migrations (dry-run first, then apply)
+        run: |
+          cd backend
+          ts-node scripts/migrate.ts --env=uat --dry-run
+          ts-node scripts/migrate.ts --env=uat
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: ${{ secrets.UAT_DB_USER }}
+          DB_PASSWORD: ${{ secrets.UAT_DB_PASSWORD }}

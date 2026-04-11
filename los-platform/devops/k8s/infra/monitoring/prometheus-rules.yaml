@@ -1,0 +1,164 @@
+# kube-prometheus-stack — Prometheus + Grafana + Alertmanager
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+# PrometheusRule — LOS Platform alert rules
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: los-platform-alerts
+  namespace: observability
+  labels:
+    app: prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: los-platform.rules
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_requests_total{service=~"los-.*",status=~"5.."}[5m])) /
+            sum(rate(http_requests_total{service=~"los-.*"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High error rate on LOS Platform"
+            description: "Error rate is above 5% for {{ $labels.service }}"
+        - alert: ServiceDown
+          expr: up{job="los-services"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.service }} is down"
+            description: "{{ $labels.service }} has been down for more than 2 minutes"
+        - alert: HighLatency
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=~"los-.*"}[5m])) by (le, service)) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on {{ $labels.service }}"
+            description: "P95 latency is above 2s for {{ $labels.service }}"
+        - alert: PodMemoryUsageHigh
+          expr: |
+            (sum(container_memory_working_set_bytes{namespace="los-platform", container!=""}) by (namespace) /
+             sum(resource.memory.limits{namespace="los-platform"}) by (namespace)) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage in los-platform namespace"
+        - alert: PDBSNotHealthy
+          expr: |
+            kube_poddisruptionbudget_status_current_healthy{namespace="los-platform"} <
+            kube_poddisruptionbudget_status_desired_healthy{namespace="los-platform"}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PodDisruptionBudget not healthy"
+            description: "Pods are not being disrupted as expected"
+        - alert: DatabaseConnectionPoolExhausted
+          expr: |
+            sum(rate(postgres_connection_errors_total[5m])) by (db_instance) > 10
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database connection pool exhausted"
+            description: "Too many connection errors on {{ $labels.db_instance }}"
+        - alert: KafkaConsumerLag
+          expr: |
+            sum(kafka_consumer_lag_sum{topic=~"los-.*"}) by (topic, consumer_group) > 10000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Kafka consumer lag on {{ $labels.topic }}"
+            description: "Consumer group {{ $labels.consumer_group }} is lagging by more than 10k messages"
+        - alert: ApplicationStageStuck
+          expr: |
+            time() - max(application_stage_changed_at{stage=~"UNDERWRITING|DECISION_PENDING|SANCTION"}) > 86400
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Application stuck in {{ $labels.stage }}"
+            description: "Application has been in {{ $labels.stage }} for more than 24 hours"
+---
+# ServiceMonitor — scrape LOS service metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: los-services
+  namespace: observability
+  labels:
+    app: prometheus
+spec:
+  selector:
+    matchLabels:
+      los-metrics: "true"
+  endpoints:
+    - port: metrics
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - los-platform-dev
+      - los-platform-uat
+      - los-platform-prod
+---
+# GrafanaDashboard — LOS Platform dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: los-platform-grafana-dashboard
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  los-platform.json: |
+    {
+      "dashboard": {
+        "title": "LOS Platform",
+        "uid": "los-platform",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {"expr": "sum(rate(http_requests_total{service=~\"los-.*\"}[5m])) by (service)", "legendFormat": "{{service}}"}
+            ]
+          },
+          {
+            "title": "Error Rate %",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {"expr": "sum(rate(http_requests_total{service=~\"los-.*\",status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total{service=~\"los-.*\"}[5m])) by (service) * 100", "legendFormat": "{{service}}"}
+            ]
+          },
+          {
+            "title": "P95 Latency (seconds)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=~\"los-.*\"}[5m])) by (le, service))", "legendFormat": "{{service}}"}
+            ]
+          },
+          {
+            "title": "Application Funnel",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {"expr": "sum(los_applications_total) by (status)", "legendFormat": "{{status}}"}
+            ]
+          }
+        ]
+      }
+    }

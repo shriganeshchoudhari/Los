@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { AuthService } from '../services/auth.service';
 import { User, OtpSession, RefreshToken, OtpPurpose } from '../entities';
 import { SendOtpDto, VerifyOtpDto } from '../dto';
 import { createError, hashMobile } from '@los/common';
+import { JwtKeyManager } from '../utils/jwt-key-manager';
 import * as bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
@@ -14,7 +14,6 @@ describe('AuthService', () => {
   let userRepository: jest.Mocked<Repository<User>>;
   let otpSessionRepository: jest.Mocked<Repository<OtpSession>>;
   let refreshTokenRepository: jest.Mocked<Repository<RefreshToken>>;
-  let jwtService: jest.Mocked<JwtService>;
   let configService: jest.Mocked<ConfigService>;
 
   const mockRedis = {
@@ -61,10 +60,8 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: JwtService,
-          useValue: {
-            sign: jest.fn().mockReturnValue('mock.jwt.token'),
-          },
+          provide: JwtKeyManager,
+          useValue: new JwtKeyManager(),
         },
         {
           provide: ConfigService,
@@ -88,7 +85,6 @@ describe('AuthService', () => {
     userRepository = module.get(getRepositoryToken(User));
     otpSessionRepository = module.get(getRepositoryToken(OtpSession));
     refreshTokenRepository = module.get(getRepositoryToken(RefreshToken));
-    jwtService = module.get(JwtService);
     configService = module.get(ConfigService);
 
     (service as any).redis = mockRedis;

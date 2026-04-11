@@ -1,0 +1,60 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/uid/otp"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "101",
+        "message": "OTP sent successfully",
+        " txnId": "uid-otp-txn-{{randomValue length=16}}",
+        "retry": false,
+        "otpLength": 6
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    },
+    "scenario": {
+      "scenarioName": "uidai_otp_flow",
+      "newScenarioState": "otp_sent"
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/uid/verify"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "200",
+        "message": "Aadhaar verification successful",
+        "txnId": "uid-verify-txn-{{randomValue length=16}}",
+        "resident": {
+          "aadhaarNumber": "XXXX-XXXX-7842",
+          "name": "{{jsonPath originalRequest body '$.name'}}",
+          "dateOfBirth": "{{jsonPath originalRequest body '$.dob'}}",
+          "gender": "{{jsonPath originalRequest body '$.gender'}}",
+          "phone": "{{jsonPath originalRequest body '$.mobile'}}",
+          "address": {
+            "addressLine1": "{{jsonPath originalRequest body '$.address.line1'}}",
+            "city": "{{jsonPath originalRequest body '$.address.city'}}",
+            "state": "{{jsonPath originalRequest body '$.address.state'}}",
+            "pincode": "{{jsonPath originalRequest body '$.address.pincode'}}"
+          },
+          "photo": "base64_encoded_photo_data_here"
+        },
+        "eKycXML": "PCEtLSBNT0NLIEtZQyBYTUwgLS0+CjxBS0FDSEFSPlBheWxvYWQgS2luZyBDbGllbnQgVHJhbnNhY3Rpb248L0FLQUNIQVI+CjxSZXNwb25zZT48UmVzdWx0PkE8L1Jlc3VsdD48VHJhbnNhY3Rpb25JRD48L1RyYW5zYWN0aW9uSUQ+CjwvUmVzcG9uc2U+CjxTaWduYXR1cmU+TU9DS19TSUcgLS0+CjwvU2lnbmF0dXJlPg==",
+        "signature": "MOCK_XML_SIGNATURE_BASE64"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

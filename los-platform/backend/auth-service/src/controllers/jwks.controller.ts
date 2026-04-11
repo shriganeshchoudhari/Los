@@ -1,18 +1,12 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SkipAuth } from '@los/common';
 import { JwtKeyManager } from '../utils/jwt-key-manager';
-import { ConfigService } from '@nestjs/config';
 
 @ApiTags('JWKS')
 @Controller('.well-known')
 export class JwksController {
-  private readonly keyManager: JwtKeyManager;
-
-  constructor(private readonly configService: ConfigService) {
-    const privateKeyPem = this.configService.get<string>('JWT_PRIVATE_KEY');
-    this.keyManager = new JwtKeyManager(privateKeyPem);
-  }
+  constructor(private readonly keyManager: JwtKeyManager) {}
 
   @Get('jwks.json')
   @SkipAuth()

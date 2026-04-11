@@ -151,9 +151,10 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: auth-service
-    SERVICE_NAME: auth-service
     ports:
       - "3001:3001"
+    volumes:
+      - ../backend/keys:/keys:ro
     environment:
       <<: *env-common
       PORT: 3001
@@ -162,7 +163,7 @@ services:
       DB_USERNAME: los_user
       DB_PASSWORD: ${DB_PASSWORD:-los_password}
       DB_NAME: los_auth
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_change_in_production}
+      JWT_PRIVATE_KEY_FILE: /keys/jwt-private.pem
       LDAP_URL: ${LDAP_URL:-ldap://localhost:389}
       LDAP_BASE_DN: ${LDAP_BASE_DN:-dc=bank,dc=internal}
       OTEL_SERVICE_NAME: auth-service
@@ -175,7 +176,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: kyc-service
-    SERVICE_NAME: kyc-service
     ports:
       - "3002:3002"
     environment:
@@ -199,7 +199,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: loan-service
-    SERVICE_NAME: loan-service
     ports:
       - "3003:3003"
     environment:
@@ -226,7 +225,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: decision-engine
-    SERVICE_NAME: decision-engine
     ports:
       - "3004:3004"
     environment:
@@ -251,7 +249,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: integration-service
-    SERVICE_NAME: integration-service
     ports:
       - "3006:3006"
     environment:
@@ -278,7 +275,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: notification-service
-    SERVICE_NAME: notification-service
     ports:
       - "3007:3007"
     environment:
@@ -305,7 +301,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: dsa-service
-    SERVICE_NAME: dsa-service
     ports:
       - "3008:3008"
     environment:
@@ -329,7 +324,6 @@ services:
       dockerfile: devops/docker/Dockerfile.backend
       args:
         SERVICE_NAME: document-service
-    SERVICE_NAME: document-service
     ports:
       - "3009:3009"
     environment:

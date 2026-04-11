@@ -56,6 +56,57 @@ jobs:
             cd ../..
           done
 
+  # ── Database Migration ────────────────────────────────────────────────────
+  database-migration:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: los_user
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create test databases
+        run: |
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_auth;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_loan;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_kyc;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_decision;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_integration;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_document;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_notification;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_dsa;"
+          PGPASSWORD=test_password psql -h localhost -U los_user -c "CREATE DATABASE los_shared;"
+
+      - name: Install ts-node
+        run: npm install -g ts-node
+
+      - name: Run migrations (dry-run first, then apply)
+        run: |
+          cd backend
+          ts-node scripts/migrate.ts --env=dev --dry-run
+          ts-node scripts/migrate.ts --env=dev
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: los_user
+          DB_PASSWORD: test_password
+
   # ── Backend Tests ────────────────────────────────────────────────────────
   backend-tests:
     name: Tests (${{ matrix.service }})

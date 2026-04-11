@@ -19,6 +19,7 @@ import {
   UpdateApplicationDto,
   AutoSaveDto,
   ApplicationResponseDto,
+  ManagerDecisionDto,
 } from '../dto';
 import { ApplicationStatus } from '../entities/loan-application.entity';
 import { RolesGuard, Roles, AuthenticatedRequest } from '@los/common';
@@ -130,5 +131,54 @@ export class LoanApplicationController {
   @ApiResponse({ status: 200, description: 'Officer assigned' })
   async assignOfficer(@Param('applicationId') applicationId: string) {
     return this.applicationService.assignOfficerRoundRobin(applicationId);
+  }
+
+  @Patch(':applicationId/decision')
+  @Roles('BRANCH_MANAGER', 'ZONAL_CREDIT_HEAD', 'CREDIT_HEAD')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manager/Branch decision: Approve, Reject, or send for Conditionally Approved with revision terms' })
+  @ApiResponse({ status: 200, description: 'Decision recorded', type: ApplicationResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid state transition or missing remarks for rejection' })
+  @ApiResponse({ status: 403, description: 'Insufficient authority for requested amount' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  async submitDecision(
+    @Param('applicationId') applicationId: string,
+    @Body() dto: ManagerDecisionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.applicationService.submitManagerDecision(applicationId, dto, req.user.id, req.user.role);
+  }
+
+  @Post(':applicationId/cancel')
+  @Roles('APPLICANT', 'LOAN_OFFICER', 'SYSTEM')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Initiate 3-day cooling-off cancellation window (RBI DLG 2022)' })
+  @ApiResponse({ status: 200, description: 'Cancellation window initiated', type: ApplicationResponseDto })
+  @ApiResponse({ status: 400, description: 'Cannot cancel — invalid state or deadline exceeded' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  async initiateCancellation(
+    @Param('applicationId') applicationId: string,
+    @Body() body: { reason: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.applicationService.initiateCancellationWindow(
+      applicationId,
+      body.reason,
+      req.user.id,
+      req.user.role,
+    );
+  }
+
+  @Post(':applicationId/cancel/confirm')
+  @Roles('APPLICANT', 'LOAN_OFFICER')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm cancellation within cooling-off window' })
+  @ApiResponse({ status: 200, description: 'Application cancelled', type: ApplicationResponseDto })
+  @ApiResponse({ status: 400, description: 'Cancellation window expired or not initiated' })
+  async confirmCancellation(
+    @Param('applicationId') applicationId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.applicationService.confirmCancellation(applicationId, req.user.id);
   }
 }

@@ -1,0 +1,129 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/ocr/salary"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "documentType": "SALARY_SLIP",
+        "confidence": 92,
+        "extractedData": {
+          "employerName": "TechCorp India Pvt Ltd",
+          "employeeName": "{{jsonPath originalRequest body '$.name'}}",
+          "designation": "Software Engineer",
+          "netSalary": 75000,
+          "grossSalary": 95000,
+          "deductions": 20000,
+          "bankName": "State Bank of India",
+          "accountNumber": "XXXXXXXX1234",
+          "month": "July",
+          "year": 2024,
+          "panNumber": "{{jsonPath originalRequest body '$.pan'}}"
+        },
+        "validation": {
+          "panMatches": true,
+          "salaryReasonable": true,
+          "documentReadable": true
+        },
+        "rawOcrText": "MOCK OCR: Salary Slip - TechCorp India - Net Salary: 75000",
+        "processedAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/ocr/bank"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "documentType": "BANK_STATEMENT",
+        "confidence": 87,
+        "extractedData": {
+          "bankName": "HDFC Bank",
+          "accountHolderName": "{{jsonPath originalRequest body '$.name'}}",
+          "accountNumberMasked": "XXXXXX1234",
+          "statementPeriod": {
+            "from": "2024-01-01",
+            "to": "2024-06-30"
+          },
+          "averageMonthlyBalance": 45000,
+          "totalCredits": 580000,
+          "totalDebits": 320000,
+          "salaryCredits": 570000,
+          "nonSalaryCredits": 10000,
+          "bouncedCheques": 0,
+          "overdraftUsed": false
+        },
+        "validation": {
+          "salaryCreditsConsistent": true,
+          "balancePositive": true,
+          "noRedFlags": true
+        },
+        "processedAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/facematch/verify"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "matchScore": 92,
+        "confidence": "HIGH",
+        "matchResult": "MATCH",
+        "aadhaarPhotoMatch": true,
+        "livenessScore": 95,
+        "livenessResult": "REAL",
+        "spoofDetection": {
+          "score": 5,
+          "result": "REAL_FACE"
+        },
+        "processedAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/ocr/pan"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "documentType": "PAN_CARD",
+        "confidence": 96,
+        "extractedData": {
+          "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+          "fullName": "{{jsonPath originalRequest body '$.name'}}",
+          "dateOfBirth": "{{jsonPath originalRequest body '$.dob'}}",
+          "fatherName": "Father Name",
+          "panStatus": "VALID"
+        },
+        "processedAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

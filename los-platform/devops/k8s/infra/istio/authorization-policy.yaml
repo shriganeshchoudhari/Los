@@ -1,0 +1,33 @@
+# Istio AuthorizationPolicy — zero-trust network policy per service
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-ingress-to-services
+  namespace: los-platform
+spec:
+  selector:
+    matchLabels:
+      app: los-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+      to:
+        - operation:
+            ports: ["3000", "3001", "3002", "3003", "3004", "3006", "3007", "3008", "3009"]
+    - from:
+        - source:
+            principals: ["cluster.local/ns/los-platform/sa/*"]
+      to:
+        - operation:
+            ports: ["3000", "3001", "3002", "3003", "3004", "3006", "3007", "3008", "3009"]
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: los-platform-mtls
+  namespace: los-platform
+spec:
+  mtls:
+    mode: STRICT

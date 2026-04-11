@@ -1,0 +1,79 @@
+# LOS Platform Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: los-platform
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/name: los-platform
+---
+# LOS Platform Service Account (used by all services)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: los-platform
+  namespace: los-platform
+  annotations:
+    eks.amazonaws.com/role-arn: ${LOS_PLATFORM_IAM_ROLE_ARN}
+---
+# Network Policy — deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: los-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# Network Policy — deny all egress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-egress
+  namespace: los-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+---
+# LimitRange — default resource requests/limits for all pods
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: los-platform
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      max:
+        cpu: "4"
+        memory: 4Gi
+      min:
+        cpu: 50m
+        memory: 64Mi
+---
+# ResourceQuota — total cluster resource consumption cap
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: los-platform-quota
+  namespace: los-platform
+spec:
+  hard:
+    requests.cpu: "32"
+    requests.memory: "64Gi"
+    limits.cpu: "64"
+    limits.memory: "128Gi"
+    pods: "100"
+    services: "20"
+    configmaps: "50"
+    secrets: "50"
+    persistentvolumeclaims: "20"

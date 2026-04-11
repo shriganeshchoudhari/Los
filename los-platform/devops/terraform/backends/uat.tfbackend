@@ -1,0 +1,6 @@
+bucket = "los-terraform-state-uat"
+key    = "uat/terraform.tfstate"
+region = "ap-south-1"
+
+dynamodb_table = "los-terraform-state-locks"
+encrypt        = true

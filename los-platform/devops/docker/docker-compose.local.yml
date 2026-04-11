@@ -1,0 +1,136 @@
+# ============================================================
+# LOS Platform — Local Development Docker Compose
+# Extension of docker-compose.yml — adds mock server, kafka-ui,
+# mailhog, and overrides all external API URLs to point to mock.
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.local.yml up
+# ============================================================
+
+version: '3.8'
+
+x-opts-mock: &opts-mock
+  depends_on:
+    mock-server:
+      condition: service_started
+
+services:
+  # ── Mock External APIs (WireMock on port 8080) ────────────────────────────
+  mock-server:
+    image: wiremock/wiremock:3.3.1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./mock-server/mappings:/home/wiremock/mappings:ro
+    command: >
+      --port 8080
+      --global-response-templating
+      --verbose
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/__admin/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - los-network
+
+  # ── Kafka UI (Redpanda Console — event inspection) ─────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - los-network
+
+  # ── MailHog (SMTP capture — email testing) ──────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP
+    networks:
+      - los-network
+
+  # ── PostgreSQL Admin UI ───────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "8050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@losbank.in
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - los-network
+
+  # ── Service overrides: point to mock server ──────────────────────────────
+  kyc-service:
+    <<: *opts-mock
+    environment:
+      UIDAI_BASE_URL: http://mock-server:8080
+      UIDAI_LICENSE_KEY: MOCK_UIDAI_LICENSE_KEY
+      NSDL_BASE_URL: http://mock-server:8080
+      NSDL_API_KEY: MOCK_NSDL_API_KEY
+      FACE_MATCH_URL: http://mock-server:8080
+      DIGILOCKER_CLIENT_ID: MOCK_DIGILOCKER_CLIENT_ID
+      DIGILOCKER_CLIENT_SECRET: MOCK_DIGILOCKER_CLIENT_SECRET
+
+  integration-service:
+    <<: *opts-mock
+    environment:
+      CBS_BASE_URL: http://mock-server:8080
+      BUREAU_CIBIL_API_KEY: MOCK_CIBIL_API_KEY
+      BUREAU_CIBIL_URL: http://mock-server:8080
+      BUREAU_EXPERIAN_API_KEY: MOCK_EXPERIAN_API_KEY
+      BUREAU_EXPERIAN_URL: http://mock-server:8080
+      BUREAU_EQUIFAX_API_KEY: MOCK_EQUIFAX_API_KEY
+      BUREAU_EQUIFAX_URL: http://mock-server:8080
+      BUREAU_CRIF_API_KEY: MOCK_CRIF_API_KEY
+      BUREAU_CRIF_URL: http://mock-server:8080
+      NPCI_BASE_URL: http://mock-server:8080
+      NPCI_API_KEY: MOCK_NPCI_API_KEY
+
+  document-service:
+    <<: *opts-mock
+    environment:
+      KARZA_API_KEY: MOCK_KARZA_API_KEY
+      KARZA_BASE_URL: http://mock-server:8080
+      SIGNZY_API_KEY: MOCK_SIGNZY_API_KEY
+      SIGNZY_BASE_URL: http://mock-server:8080
+
+  notification-service:
+    <<: *opts-mock
+    environment:
+      SMS_PROVIDER_API_KEY: MOCK_KALEYRA_API_KEY
+      SMS_PROVIDER_URL: http://mock-server:8080
+      WHATSAPP_PROVIDER_API_KEY: MOCK_GUPSHUP_API_KEY
+      WHATSAPP_PROVIDER_URL: http://mock-server:8080
+      EMAIL_PROVIDER_API_KEY: MOCK_SENDGRID_API_KEY
+      EMAIL_PROVIDER_URL: http://mock-server:8080
+      FCM_SERVER_KEY: MOCK_FCM_SERVER_KEY
+
+  auth-service:
+    <<: *opts-mock
+    environment:
+      SMS_API_URL: http://mock-server:8080
+      SMS_API_KEY: MOCK_KALEYRA_API_KEY
+      TEST_OTP_OVERRIDE: "123456"   # Fixed OTP for local dev — never use in prod
+
+  loan-service:
+    <<: *opts-mock
+    environment:
+      CBS_BASE_URL: http://mock-server:8080
+      NSDL_ESIGN_URL: http://mock-server:8080
+      NSDL_ESIGN_API_KEY: MOCK_NSDL_ESIGN_API_KEY
+
+networks:
+  los-network:
+    external: false

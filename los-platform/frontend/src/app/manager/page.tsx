@@ -14,6 +14,9 @@ export default function BranchManagerPage() {
   const [loading, setLoading] = useState(true);
   const [bureauData, setBureauData] = useState<any>(null);
   const [loadingBureau, setLoadingBureau] = useState(false);
+  const [sanctionRemarks, setSanctionRemarks] = useState('');
+  const [overrideAmount, setOverrideAmount] = useState('');
+  const [showRevisionForm, setShowRevisionForm] = useState(false);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -47,13 +50,31 @@ export default function BranchManagerPage() {
     .reduce((sum, a) => sum + (a.sanctionedAmount || 0), 0);
 
   const handleSanction = async (appId: string, action: 'APPROVE' | 'REJECT' | 'REVISION') => {
+    if (action === 'REVISION') {
+      setShowRevisionForm(true);
+      return;
+    }
+    if (action === 'REJECT' && !sanctionRemarks.trim()) {
+      toast.error('Remarks are required for rejection');
+      return;
+    }
     setActionLoading(appId);
     try {
-      toast.success(`Application ${action === 'APPROVE' ? 'sanctioned' : action === 'REJECT' ? 'rejected' : 'sent for revision'}`);
+      const apiAction = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+      await loanApi.submitDecision(appId, {
+        action: apiAction,
+        remarks: sanctionRemarks || undefined,
+        sanctionedAmount: action === 'APPROVE' && overrideAmount
+          ? Number(overrideAmount.replace(/\D/g, ''))
+          : undefined,
+      });
+      toast.success(`Application ${action === 'APPROVE' ? 'approved' : 'rejected'}`);
+      setSanctionRemarks('');
+      setOverrideAmount('');
       setSelectedAppId(null);
       await fetchApplications();
-    } catch {
-      toast.error('Action failed. Please try again.');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Action failed. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -194,6 +215,54 @@ export default function BranchManagerPage() {
                     </div>
                   )}
 
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground mb-1 block">Remarks *</label>
+                    <textarea
+                      value={sanctionRemarks}
+                      onChange={(e) => setSanctionRemarks(e.target.value)}
+                      placeholder={actionLoading === selected.id ? '' : 'Enter remarks (required for rejection/conditional approval)'}
+                      className="input resize-none text-sm"
+                      rows={2}
+                      disabled={!!actionLoading}
+                    />
+                  </div>
+
+                  {showRevisionForm && (
+                    <div className="border border-amber-300 rounded-lg p-4 bg-amber-50 space-y-3">
+                      <p className="text-sm font-semibold text-amber-800">Revision Terms (for Conditionally Approved)</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Override Amount (₹)</label>
+                          <input
+                            type="text"
+                            value={overrideAmount}
+                            onChange={(e) => setOverrideAmount(e.target.value)}
+                            placeholder={String(selected?.requestedAmount || selected?.loanAmount || 0)}
+                            className="input font-mono text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Revised Tenure (months)</label>
+                          <input
+                            type="number"
+                            placeholder="36"
+                            className="input font-mono text-sm"
+                            min={6}
+                            max={360}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1 block">Conditions / Revision Terms</label>
+                        <textarea
+                          className="input resize-none text-sm"
+                          rows={2}
+                          placeholder="e.g., Reduced amount ₹15L at 10.5% p.a. subject to property verification..."
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button
                       className="flex-1 bg-green-600 hover:bg-green-700"
@@ -207,16 +276,46 @@ export default function BranchManagerPage() {
                       onClick={() => handleSanction(selected.id, 'REVISION')}
                       disabled={actionLoading === selected.id}
                     >
-                      Revise
+                      {showRevisionForm ? 'Cancel Revision' : 'Revise'}
                     </Button>
                     <Button
                       variant="destructive"
                       onClick={() => handleSanction(selected.id, 'REJECT')}
-                      disabled={actionLoading === selected.id}
+                      disabled={actionLoading === selected.id || !sanctionRemarks.trim()}
                     >
                       Reject
                     </Button>
                   </div>
+
+                  {showRevisionForm && (
+                    <Button
+                      className="w-full"
+                      onClick={async () => {
+                        const amt = overrideAmount ? Number(overrideAmount.replace(/\D/g, '')) : undefined;
+                        setActionLoading(selected.id);
+                        try {
+                          await loanApi.submitDecision(selected.id, {
+                            action: 'CONDITIONALLY_APPROVED',
+                            remarks: sanctionRemarks || undefined,
+                            sanctionedAmount: amt,
+                          });
+                          toast.success('Application sent for conditional approval with revision terms');
+                          setSanctionRemarks('');
+                          setOverrideAmount('');
+                          setShowRevisionForm(false);
+                          setSelectedAppId(null);
+                          await fetchApplications();
+                        } catch (err: any) {
+                          toast.error(err.response?.data?.message || 'Action failed');
+                        } finally {
+                          setActionLoading(null);
+                        }
+                      }}
+                      disabled={!sanctionRemarks.trim() || actionLoading === selected.id}
+                    >
+                      {actionLoading === selected.id ? 'Processing...' : 'Send for Conditional Approval'}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (

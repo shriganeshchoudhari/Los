@@ -12,7 +12,7 @@ COPY common/tsconfig.json ./services/common/
 COPY common/src ./services/common/src
 
 WORKDIR /app/services/${SERVICE_NAME}
-RUN npm ci --only=production --prefix ../common && npm ci && npm run build
+RUN npm ci --prefix ../common && npm ci && npm run build
 
 FROM node:20-alpine AS production
 

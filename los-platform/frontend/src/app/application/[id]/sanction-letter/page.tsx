@@ -8,7 +8,7 @@ import { OTPDigitInput } from '@/components/ui/components';
 import { sanctionLetterApi, loanAgreementApi } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
-type FlowStep = 'SANCTION_REVIEW' | 'GENERATING' | 'AGREEMENT_REVIEW' | 'ESIGN_INITIATING' | 'ESIGN_WAITING' | 'ESIGN_VERIFYING' | 'ESIGN_SUCCESS' | 'ESIGN_FAILED';
+type FlowStep = 'KFS_REVIEW' | 'SANCTION_REVIEW' | 'GENERATING' | 'AGREEMENT_REVIEW' | 'ESIGN_INITIATING' | 'ESIGN_WAITING' | 'ESIGN_VERIFYING' | 'ESIGN_SUCCESS' | 'ESIGN_FAILED';
 
 interface SanctionData {
   applicationNumber: string;
@@ -46,13 +46,14 @@ export default function SanctionLetterPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [step, setStep] = useState<FlowStep>('SANCTION_REVIEW');
+  const [step, setStep] = useState<FlowStep>('KFS_REVIEW');
   const [sanctionData, setSanctionData] = useState<SanctionData | null>(null);
   const [agreementId, setAgreementId] = useState<string>('');
   const [agreementNumber, setAgreementNumber] = useState<string>('');
   const [esignState, setEsignState] = useState<ESignState | null>(null);
   const [loading, setLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [kfsAcknowledged, setKfsAcknowledged] = useState(false);
 
   const [signerName, setSignerName] = useState('');
   const [signerMobile, setSignerMobile] = useState('');
@@ -77,6 +78,14 @@ export default function SanctionLetterPage() {
   useEffect(() => {
     fetchSanctionData();
   }, [fetchSanctionData]);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(`kfs_acknowledged_${id}`);
+    if (saved === 'true') {
+      setKfsAcknowledged(true);
+      setStep('SANCTION_REVIEW');
+    }
+  }, [id]);
 
   useEffect(() => {
     if (otpCountdown <= 0) return;
@@ -213,6 +222,159 @@ export default function SanctionLetterPage() {
       </header>
 
       <main id="main-content" className="container py-6 space-y-6 max-w-4xl">
+        {step === 'KFS_REVIEW' && (
+          <>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+              <span className="text-2xl mt-0.5">📋</span>
+              <div>
+                <p className="font-semibold text-amber-800">Key Facts Statement (KFS)</p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  Per RBI's Fair Practices Code &amp; Digital Lending Guidelines, please review all cost disclosures below before proceeding.
+                </p>
+              </div>
+            </div>
+
+            <Card className="border-amber-300">
+              <CardHeader>
+                <CardTitle>Key Facts Statement</CardTitle>
+                <CardDescription>
+                  {sanctionData.customerName} · {sanctionData.productName} · Sanction Date: {formatDate(sanctionData.sanctionDate)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-green-700 font-medium">Principal Loan Amount</p>
+                      <p className="text-2xl font-bold text-green-800">{formatCurrency(sanctionData.sanctionedAmount)}</p>
+                      <p className="text-sm text-green-600">{sanctionData.sanctionedAmountInWords}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-green-700 font-medium">Net Disbursement (after fees)</p>
+                      <p className="text-2xl font-bold text-green-800">{formatCurrency(Math.max(0, sanctionData.sanctionedAmount - sanctionData.processingFeeAmount))}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">Rate of Interest (p.a.)</p>
+                    <p className="font-bold text-base">{sanctionData.rateOfInterestPercent}%</p>
+                    <p className="text-xs text-muted-foreground">Simple Annual Rate</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">Processing Fee</p>
+                    <p className="font-bold text-base">{formatCurrency(sanctionData.processingFeeAmount)}</p>
+                    <p className="text-xs text-muted-foreground">+ applicable GST</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">EMI Amount</p>
+                    <p className="font-bold text-base">{formatCurrency(sanctionData.emiAmount)}</p>
+                    <p className="text-xs text-muted-foreground">Monthly</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">Tenure</p>
+                    <p className="font-bold text-base">{sanctionData.tenureMonths} months</p>
+                    <p className="text-xs text-muted-foreground">{sanctionData.firstEmiDate ? `From ${formatDate(sanctionData.firstEmiDate)}` : ''}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Principal Loan Amount</span>
+                    <span className="font-semibold">{formatCurrency(sanctionData.sanctionedAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Total Interest Payable</span>
+                    <span className="font-semibold">{formatCurrency(sanctionData.totalPayableAmount - sanctionData.sanctionedAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Processing Fee (+ GST)</span>
+                    <span className="font-semibold">{formatCurrency(sanctionData.processingFeeAmount * 1.18)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold border-t pt-2">
+                    <span>Total Amount Payable</span>
+                    <span>{formatCurrency(sanctionData.totalPayableAmount + sanctionData.processingFeeAmount * 1.18)}</span>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-sm text-blue-800 font-semibold">Annual Percentage Rate (APR)</p>
+                      <p className="text-xs text-blue-600">Effective annual cost of credit, including all charges</p>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {sanctionData.rateOfInterestPercent}%
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">First EMI Date</p>
+                    <p className="font-semibold">{formatDate(sanctionData.firstEmiDate)}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">Last EMI Date</p>
+                    <p className="font-semibold">{formatDate(sanctionData.lastEmiDate)}</p>
+                  </div>
+                </div>
+
+                {sanctionData.sanctionedAmount <= 50000 && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3">
+                    <span className="text-xl mt-0.5">⏱️</span>
+                    <div>
+                      <p className="font-semibold text-orange-800 text-sm">Cooling-off Period — 3-Day Cancellation Right</p>
+                      <p className="text-sm text-orange-700 mt-1">
+                        As per RBI's Digital Lending Guidelines, for loans up to ₹50,000, you have the right to cancel this loan within <strong>3 working days</strong>
+                        from the date of disbursement by contacting the bank and repaying the full disbursed amount. No foreclosure charges will apply during this period.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+                  <p><strong>Interest rate is subject to revision</strong> based on the bank's Base Rate / MCLR changes. Please refer to the sanction letter for detailed terms.</p>
+                  <p><strong>Insurance:</strong> Life/asset insurance is optional and not linked to loan approval.</p>
+                  <p><strong>Grievance Redressal:</strong> Contact our GRO at gro@bankname.com or call 1800-XXX-XXXX.</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="kfs"
+                    checked={kfsAcknowledged}
+                    onChange={(e) => setKfsAcknowledged(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <label htmlFor="kfs" className="text-sm cursor-pointer">
+                    I/We confirm that I/We have read and understood the Key Facts Statement (KFS) containing all cost disclosures, 
+                    including the Annual Percentage Rate (APR), processing fees, and total amount payable. I/We accept the information provided herein.
+                  </label>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              className="w-full"
+              size="lg"
+              disabled={!kfsAcknowledged}
+              onClick={() => { 
+                sessionStorage.setItem(`kfs_acknowledged_${id}`, 'true');
+                setKfsAcknowledged(true);
+                setStep('SANCTION_REVIEW');
+              }}
+            >
+              Proceed to Sanction Letter
+            </Button>
+          </>
+        )}
+
         {step === 'SANCTION_REVIEW' && (
           <>
             <Card>

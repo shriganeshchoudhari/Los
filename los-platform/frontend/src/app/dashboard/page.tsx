@@ -32,6 +32,15 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>('ALL');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [profile, setProfile] = useState<{ fullName?: string; role?: string; branchName?: string } | null>(null);
+
+  useEffect(() => {
+    import('@/lib/api').then(({ authApi }) => {
+      authApi.getProfile()
+        .then(res => setProfile(res.data?.data ?? res.data))
+        .catch(() => {});
+    });
+  }, []);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['applications', activeTab, page, search],
@@ -71,13 +80,13 @@ export default function DashboardPage() {
               </div>
               <div className="border-l pl-4 hidden md:block">
                 <p className="text-xs text-muted-foreground">Branch</p>
-                <p className="font-semibold text-sm">Andheri East, Mumbai</p>
+                <p className="font-semibold text-sm">{profile?.branchName ?? '—'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium">Amit Kulkarni</p>
-                <p className="text-xs text-muted-foreground">Loan Officer</p>
+                <p className="text-sm font-medium">{profile?.fullName ?? 'Loading...'}</p>
+                <p className="text-xs text-muted-foreground">{profile?.role ? profile.role.replace(/_/g, ' ') : '—'}</p>
               </div>
               <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">AK</div>
               <Button variant="ghost" size="sm">Logout</Button>

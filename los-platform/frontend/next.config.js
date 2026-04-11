@@ -6,11 +6,9 @@ const nextConfig = {
     domains: ['localhost', 's3.amazonaws.com', 'minio.local'],
     unoptimized: true,
   },
-  env: {
-    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001',
-    NEXT_PUBLIC_AUTH_SERVICE_URL: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001',
-    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-  },
+  // NOTE: Do NOT use the `env:` block for NEXT_PUBLIC_* vars — it bakes values
+  // into the standalone bundle at build time and overrides Docker runtime env vars.
+  // Instead, pass NEXT_PUBLIC_* as Docker build args: docker build --build-arg NEXT_PUBLIC_AUTH_SERVICE_URL=...
 };
 
 module.exports = nextConfig;

@@ -1,0 +1,144 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/bureau/cibil/report"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "bureau": "CIBIL",
+        "reportId": "CIB-{{randomValue length=8}}",
+        "score": 720,
+        "grade": "B",
+        "applicantName": "{{jsonPath originalRequest body '$.name'}}",
+        "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+        "reportDate": "{{now format='yyyy-MM-dd'}}",
+        "totalAccounts": 2,
+        "activeAccounts": 1,
+        "closedAccounts": 1,
+        "totalOutstanding": 150000,
+        "totalMonthlyEmi": 15000,
+        "dpdBucket": {
+          "current": 1,
+          "dpd0To30": 0,
+          "dpd31To60": 0,
+          "dpd61To90": 0,
+          "dpd90Plus": 0
+        },
+        "enquiries": {
+          "last30Days": 0,
+          "last90Days": 1,
+          "last12Months": 2
+        },
+        "creditUtilization": 28,
+        "suitFiled": false,
+        "writeOff": false,
+        "accounts": [
+          {
+            "accountType": "Home Loan",
+            "status": "Active",
+            "sanctionedAmount": 2000000,
+            "outstandingAmount": 1500000,
+            "currentBalance": 1500000,
+            "emiAmount": 25000,
+            "dpd": 0,
+            "openDate": "2022-06-15",
+            "closeDate": null,
+            "lastPaymentDate": "{{now format='yyyy-MM-dd'}}"
+          },
+          {
+            "accountType": "Personal Loan",
+            "status": "Closed",
+            "sanctionedAmount": 500000,
+            "outstandingAmount": 0,
+            "currentBalance": 0,
+            "emiAmount": 15000,
+            "dpd": 0,
+            "openDate": "2021-01-10",
+            "closeDate": "2024-01-10",
+            "lastPaymentDate": "2024-01-10"
+          }
+        ],
+        "remarks": "Mock bureau report — replace with real CIBIL API response"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/bureau/experian/report"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "bureau": "Experian",
+        "reportId": "EXP-{{randomValue length=8}}",
+        "score": 735,
+        "grade": "B",
+        "applicantName": "{{jsonPath originalRequest body '$.name'}}",
+        "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+        "reportDate": "{{now format='yyyy-MM-dd'}}",
+        "totalAccounts": 1,
+        "activeAccounts": 1,
+        "creditUtilization": 35,
+        "suitFiled": false,
+        "writeOff": false
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/bureau/crif/report"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "bureau": "CRIF",
+        "reportId": "CRF-{{randomValue length=8}}",
+        "score": 710,
+        "applicantName": "{{jsonPath originalRequest body '$.name'}}",
+        "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+        "reportDate": "{{now format='yyyy-MM-dd'}}",
+        "totalAccounts": 1,
+        "creditUtilization": 42
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/bureau/equifax/report"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "bureau": "Equifax",
+        "reportId": "EQF-{{randomValue length=8}}",
+        "score": 705,
+        "applicantName": "{{jsonPath originalRequest body '$.name'}}",
+        "panNumber": "{{jsonPath originalRequest body '$.pan'}}",
+        "reportDate": "{{now format='yyyy-MM-dd'}}",
+        "totalAccounts": 1,
+        "creditUtilization": 38
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

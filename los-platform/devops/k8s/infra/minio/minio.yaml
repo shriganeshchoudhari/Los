@@ -1,0 +1,97 @@
+# MinIO Operator + Tenant — S3-compatible object storage for document service
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: minio-operator
+  namespace: operators
+spec:
+  channel: stable
+  name: minio-operator
+  source: operatorhubio-catalog
+  sourceNamespace: olm
+---
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: los-minio
+  namespace: minio
+spec:
+  image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+  imagePullPolicy: IfNotPresent
+  pool:
+    - name: pool-1
+      servers: 2
+      volumesPerServer: 4
+      volumeClaimTemplate:
+        metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Gi
+          storageClassName: gp3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+  mounts:
+    - name: certs
+      mountPath: /root/.minio/certs
+      readOnly: false
+  env:
+    - name: MINIO_BROWSER_LOGIN_MESSAGE
+      value: "LOS Platform Document Storage"
+  console:
+    image: minio/console:v0.34.0
+    replicas: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  prometheusOperator: true
+  serviceAccountName: minio-sa
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: los-minio
+  namespace: minio
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+  selector:
+    app: minio
+---
+# StorageClass for document-service to use
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: los-minio-storage
+provisioner: minio.min.io/globals
+parameters:
+  namespace: minio
+  objectStoreName: los-minio
+  objectStoreNamespace: minio

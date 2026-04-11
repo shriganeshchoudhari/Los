@@ -1,0 +1,44 @@
+[
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/sms/send"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "statusCode": "1701",
+        "message": "Message sent successfully",
+        "messageId": "SMS-MOCK-{{randomValue length=16}}",
+        "destination": "{{jsonPath originalRequest body '$.to'}}",
+        "senderId": "{{jsonPath originalRequest body '$.sender'}}",
+        "route": "TRANSACTIONAL",
+        "sentAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  },
+  {
+    "request": {
+      "method": "POST",
+      "urlPath": "/whatsapp/send"
+    },
+    "response": {
+      "status": 200,
+      "jsonBody": {
+        "success": true,
+        "messageId": "WA-MOCK-{{randomValue length=16}}",
+        "destination": "{{jsonPath originalRequest body '$.to'}}",
+        "channel": "WHATSAPP",
+        "status": "DELIVERED",
+        "sentAt": "{{now format='yyyy-MM-dd HH:mm:ss'}}"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+]

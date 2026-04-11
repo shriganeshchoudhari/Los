@@ -5,7 +5,8 @@ import { Redis } from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt';
+import * as crypto from 'crypto';
+import { JwtKeyManager } from '../utils/jwt-key-manager';
 import {
   User,
   OtpSession,
@@ -50,7 +51,7 @@ export class AuthService {
     private readonly otpSessionRepository: Repository<OtpSession>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
-    private readonly jwtService: JwtService,
+    private readonly jwtKeyManager: JwtKeyManager,
     private readonly configService: ConfigService,
     private readonly ldapService: LdapService,
   ) {
@@ -302,7 +303,7 @@ export class AuthService {
   }
 
   async revokeToken(token: string, reason: string): Promise<void> {
-    const payload = this.jwtService.decode(token) as any;
+    const payload = this.decodeJwtPayload(token);
     if (!payload) {
       throw createError('AUTH_005', 'Invalid token');
     }
@@ -361,9 +362,7 @@ export class AuthService {
       scope: this.getScopesForRole(user.role),
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '15m',
-    });
+    const accessToken = this.signJwt(payload, 15 * 60);
 
     const refreshTokenValue = generateIdempotencyKey();
     const refreshTokenHash = await bcrypt.hash(refreshTokenValue, 10);
@@ -392,6 +391,38 @@ export class AuthService {
     };
   }
 
+  private signJwt(payload: Record<string, unknown>, expiresInSeconds: number): string {
+    const header = { alg: 'RS256', typ: 'JWT', kid: this.jwtKeyManager.getKid() };
+    const now = Math.floor(Date.now() / 1000);
+    const fullPayload = { ...payload, iat: now, exp: now + expiresInSeconds };
+
+    const base64url = (b: string) =>
+      Buffer.from(b).toString('base64url');
+
+    const encodedHeader = base64url(JSON.stringify(header));
+    const encodedPayload = base64url(JSON.stringify(fullPayload));
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(signingInput);
+    sign.end();
+    const signature = sign.sign(this.jwtKeyManager.getPrivateKey());
+
+    return `${signingInput}.${base64url(signature.toString('base64url'))}`;
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return null;
+      const payload = parts[1];
+      const padded = payload.padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '=');
+      return JSON.parse(Buffer.from(padded, 'base64url').toString('utf-8'));
+    } catch {
+      return null;
+    }
+  }
+
   private getScopesForRole(role: string): string[] {
     return getScopesForRole(role as UserRole);
   }
@@ -412,8 +443,11 @@ export class AuthService {
   private async sendSms(mobile: string, message: string): Promise<void> {
     const smsApiKey = this.configService.get<string>('SMS_API_KEY');
     const senderId = this.configService.get<string>('SMS_SENDER_ID');
+    const smsApiUrl = this.configService.get<string>('SMS_API_URL')
+      || this.configService.get<string>('KALEYRA_URL')
+      || 'https://api.kaleyra.io/v1';
 
-    const response = await fetch('https://api.kaleyra.io/v1/HXIN17452HS142HS/send', {
+    const response = await fetch(`${smsApiUrl}/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

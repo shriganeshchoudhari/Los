@@ -1,0 +1,236 @@
+# LOS Platform — Kong Gateway Declarative Configuration
+# Production: deploy this via Kong for Kubernetes Ingress or DB-less mode.
+# Usage:
+#   Kong Docker:     kong config parse kong.yaml && kong migrations up
+#   Kong K8s:        apply via KongIngress CRD or Deck sync
+#
+# Features enabled:
+#   - JWT authentication (RS256 validation via JWKS endpoint)
+#   - Rate limiting (per consumer/IP)
+#   - CORS
+#   - Request/response logging
+#   - Correlation ID propagation
+#   - Circuit breaker (mock — enable per upstream in prod)
+
+_format_version: "3.0"
+
+# ── Services ────────────────────────────────────────────────────────────────────
+services:
+  - name: auth-service
+    url: http://auth-service:3001
+    routes:
+      - name: auth-route
+        paths: [/auth]
+        strip_path: false
+    plugins:
+      - name: jwt
+        config:
+          uri_param_names: [jwt]
+          header_names: [Authorization]
+          claims_to_verify: [exp, nbf]
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+          fault_tolerant: true
+          hide_client_headers: false
+        enabled: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-Id, X-Correlation-Id]
+          exposed_headers: [X-Request-Id]
+          credentials: false
+          max_age: 3600
+        enabled: true
+      - name: correlation-id
+        config:
+          header_name: X-Correlation-Id
+          generator: uuid
+          echo_downstream: true
+        enabled: true
+
+  - name: kyc-service
+    url: http://kyc-service:3002
+    routes:
+      - name: kyc-route
+        paths: [/kyc]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+  - name: loan-service
+    url: http://loan-service:3003
+    routes:
+      - name: loan-route
+        paths: [/applications, /loan-agreement, /sanction-letter, /audit-logs]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+      - name: request-transformer
+        config:
+          add:
+            headers: [X-Gateway: kong-los-platform]
+        enabled: true
+
+  - name: document-service
+    url: http://document-service:3009
+    routes:
+      - name: document-route
+        paths: [/documents]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+  - name: decision-engine
+    url: http://decision-engine:3004
+    routes:
+      - name: decision-route
+        paths: [/decisions]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+  - name: integration-service
+    url: http://integration-service:3006
+    routes:
+      - name: integration-route
+        paths: [/integration]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+  - name: notification-service
+    url: http://notification-service:3007
+    routes:
+      - name: notification-route
+        paths: [/notifications]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+  - name: dsa-service
+    url: http://dsa-service:3008
+    routes:
+      - name: dsa-route
+        paths: [/dsa]
+        strip_path: false
+    plugins:
+      - name: jwt
+        enabled: true
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          redis_host: redis
+          redis_port: 6379
+        enabled: true
+      - name: cors
+        enabled: true
+      - name: correlation-id
+        enabled: true
+
+# ── Consumers (API Keys for external integrations) ───────────────────────────────
+# For bank CBS / NPCI / NSDL — use API key auth instead of JWT
+consumers:
+  - username: cbs-finacle
+    keyauth_credentials:
+      - key: CHANGE_ME_CBS_API_KEY
+  - username: npci-bureau
+    keyauth_credentials:
+      - key: CHANGE_ME_NPCI_API_KEY
+  - username: nsdl-esign
+    keyauth_credentials:
+      - key: CHANGE_ME_NSDL_API_KEY
+
+# ── Global Plugins ──────────────────────────────────────────────────────────────
+plugins:
+  - name: prometheus
+    config:
+      per_consumer: false
+    enabled: true
+  - name: ip-restriction
+    config:
+      allow: [0.0.0.0/0, ::/0]
+    enabled: false  # Enable in prod; restrict to bank IP ranges
+  - name: response-transformer
+    config:
+      add:
+        headers: [X-Kong-Upstream-Latency, X-Kong-Proxy-Latency]
+    enabled: true

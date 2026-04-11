@@ -1,0 +1,35 @@
+# ArgoCD AppProject — limits where LOS Platform can deploy
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: los-platform
+  namespace: argocd
+spec:
+  description: LOS Platform project
+  sourceRepos:
+    - https://github.com/YOUR_ORG/los-platform.git
+    - https://github.com/YOUR_ORG/los-platform-infra.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: los-platform-dev
+    - server: https://kubernetes.default.svc
+      namespace: los-platform-uat
+    - server: https://kubernetes.default.svc
+      namespace: los-platform-prod
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: ""
+      kind: NetworkPolicy
+    - group: ""
+      kind: LimitRange
+    - group: ""
+      kind: ResourceQuota
+  namespaceResourceBlacklist:
+    - group: ""
+      kind: ResourceQuota
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: LimitRange
+    - group: ""
+      kind: NetworkPolicy

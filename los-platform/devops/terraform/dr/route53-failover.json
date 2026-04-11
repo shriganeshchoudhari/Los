@@ -1,0 +1,38 @@
+# DR Route 53 Failover — swap primary → DR
+# Run: aws route53 change-resource-record-sets --hosted-zone-id <ZONE_ID> --change-batch file://route53-failover.json
+
+{
+  "Comment": "DR Failover: Switch API traffic from primary to DR region",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "api.los-bank.in",
+        "Type": "A",
+        "SetIdentifier": "los-platform-prod-primary",
+        "Failover": "PRIMARY",
+        "AliasTarget": {
+          "DNSName": "dualstack.los-platform-elb-prod-*.elb.ap-south-1.amazonaws.com",
+          "EvaluateTargetHealth": true,
+          "HostedZoneId": "ZNEW"
+        },
+        "HealthCheckId": "<PRIMARY_HEALTH_CHECK_ID>"
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "api.los-bank.in",
+        "Type": "A",
+        "SetIdentifier": "los-platform-dr",
+        "Failover": "SECONDARY",
+        "AliasTarget": {
+          "DNSName": "dualstack.los-platform-elb-dr-*.elb.ap-southeast-1.amazonaws.com",
+          "EvaluateTargetHealth": true,
+          "HostedZoneId": "ZNEW"
+        },
+        "HealthCheckId": "<DR_HEALTH_CHECK_ID>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+# Istio Base CRDs + Control Plane
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio-control-plane
+  namespace: istio-system
+spec:
+  profile: default
+  namespace: istio-system
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        hpaSpec:
+          minReplicas: 2
+          maxReplicas: 5
+          scaleTargetRef:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: istiod
+    ingressGateways:
+      - name: istio-ingressgateway
+        k8s:
+          hpaSpec:
+            minReplicas: 2
+            maxReplicas: 5
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          service:
+            type: LoadBalancer
+            ports:
+              - name: http
+                port: 80
+                targetPort: 8080
+              - name: https
+                port: 443
+                targetPort: 8443
+  meshConfig:
+    enableAutoMtls: true
+    defaultConfig:
+      proxyMetadata:
+        ISTIO_META_DNS_CAPTURE: "true"
+        ISTIO_META_DNS_AUTO_ALLOCATE: "true"
+      tracing:
+        sampling: 10.0
+        zipkin:
+          address: jaeger-collector.observability:9411
+    extensionProviders:
+      - name: prometheus
+        prometheus:
+          metricsPath: /metrics

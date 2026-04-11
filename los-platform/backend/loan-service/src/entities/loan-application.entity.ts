@@ -28,6 +28,7 @@ export enum ApplicationStatus {
   REJECTED = 'REJECTED',
   WITHDRAWN = 'WITHDRAWN',
   CANCELLED = 'CANCELLED',
+  CANCELLATION_WINDOW = 'CANCELLATION_WINDOW',
   SANCTIONED = 'SANCTIONED',
   DISBURSEMENT_IN_PROGRESS = 'DISBURSEMENT_IN_PROGRESS',
   DISBURSED = 'DISBURSED',
@@ -197,6 +198,21 @@ export class LoanApplication {
 
   @Column({ name: 'disbursed_at', type: 'timestamptz', nullable: true })
   disbursedAt?: Date;
+
+  @Column({ name: 'cancellation_window_initiated_at', type: 'timestamptz', nullable: true })
+  cancellationWindowInitiatedAt?: Date;
+
+  @Column({ name: 'cancellation_window_deadline', type: 'timestamptz', nullable: true })
+  cancellationWindowDeadline?: Date;
+
+  @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
+  cancellationReason?: string;
+
+  @Column({ name: 'cancellation_by_role', length: 30, nullable: true })
+  cancellationByRole?: string;
+
+  @Column({ name: 'cancellation_by_user_id', nullable: true })
+  cancellationByUserId?: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
