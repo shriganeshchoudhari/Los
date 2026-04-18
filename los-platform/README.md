@@ -1,45 +1,35 @@
 # LOS Platform — Loan Origination System
 
-A production-grade microservices-based Loan Origination System for an Indian bank, built with NestJS, Next.js, PostgreSQL, Kafka, Redis, and MinIO.
+A production-grade Loan Origination System for an Indian bank, built with Spring Boot (Java 21), Next.js, PostgreSQL, Kafka, Redis, and MinIO.
+
+> **Migration Note:** The backend was migrated from NestJS (8 microservices) to Spring Boot (1 monolithic JAR). The NestJS code is preserved in `backend/` for reference. The Spring Boot backend lives in `backend-java/`.
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      API Gateway (Kong)                       │
-└──────┬───────┬───────┬───────┬───────┬───────┬──────┬──────┘
-       │       │       │       │       │       │      │
-   ┌───┴─┐ ┌──┴─┐ ┌───┴─┐ ┌───┴─┐ ┌───┴─┐ ┌───┴─┐  ┌──┴──┐
-   │Auth │ │KYC │ │Loan │ │Docs │ │Dec. │ │Int. │  │DSA  │
-   │:3001│ │:3002│ │:3003│ │:3004│ │:3005│ │:3006│  │:3008│
-   └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘  └──┬──┘
-      │       │       │       │       │       │       │
-  ┌───┴───────┴───────┴───────┴───────┴───────┴───────┴───┐
-  │                    Kafka Event Bus                     │
-  └───┬───────┬───────┬───────┬───────┬───────┬───────────┘
-      │       │       │       │       │       │
- ┌────┴──┐ ┌──┴──┐ ┌──┴──┐ ┌──┴──┐ ┌──┴──┐ ┌──┴──────┐
- │Redis  │ │Post-│ │Post-│ │Post-│ │Post-│ │PostgreSQL│
- │Sentinel│ │greSQL│ │greSQL│ │greSQL│ │greSQL│ │(Shared) │
- └───────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────────┘
+│                    Spring Boot Monolith                      │
+│                     (Java 21, Port 8080)                    │
+│  ┌────────┬─────────┬───────┬───────┬───────┬──────────┐ │
+│  │ Auth   │   KYC   │ Loan  │Decision│  Int. │  Others  │ │
+│  │ /api/  │ /api/   │/api/  │ /api/  │ /api/ │  /api/   │ │
+│  │  auth  │   kyc   │ loan  │decision│  int. │   ...    │ │
+│  └────────┴─────────┴───────┴───────┴───────┴──────────┘ │
+└──────────────────────┬────────────────────────────────────┘
+                       │
+       ┌───────────────┼───────────────┐
+       │               │               │
+  ┌────┴────┐   ┌─────┴─────┐   ┌────┴────┐
+  │PostgreSQL│   │   Redis   │   │  Kafka  │
+  │(9 schemas)│   │  Sentinel  │   │         │
+  └──────────┘   └───────────┘   └─────────┘
 ```
 
-## Services
-
-| Service | Port | Database | Description |
-|---------|------|----------|-------------|
-| Auth Service | 3001 | `los_auth` | OTP (SMS/WhatsApp), JWT, LDAP, sessions |
-| KYC Service | 3002 | `los_kyc` | Aadhaar eKYC, PAN verify, face match |
-| Loan Service | 3003 | `los_loan` | Applications, EMI, sanction letters, agreements |
-| Document Service | 3009 | `los_document` | Presigned URLs, OCR, watermarking, checklists |
-| Decision Engine | 3005 | `los_decision` | Rule engine (47 rules), ML scorecard, decisions |
-| Integration Service | 3006 | `los_integration` | Bureau (CIBIL/Experian/Equifax/CRIF), NACH, disbursement |
-| Notification Service | 3007 | `los_notification` | SMS (Kaleyra/Gupshup), email templates |
-| DSA Service | 3008 | `los_dsa` | DSA partner portal, officer management |
+## Services (Spring Boot Modules)
 
 ## Tech Stack
 
-- **Backend:** NestJS, TypeORM, PostgreSQL 15, Kafka (KafkaJS), Redis Sentinel, MinIO
+- **Backend:** Spring Boot 3.4 (Java 21, Maven), JPA/Hibernate, PostgreSQL 15, Kafka (Spring Kafka), Redis Sentinel, MinIO
 - **Frontend:** Next.js 14, React 18, Tailwind CSS, shadcn/ui, React Query, React Hook Form
 - **Observability:** OpenTelemetry, Prometheus, Grafana, Jaeger
 - **Infrastructure:** Docker Compose (local), Kubernetes (EKS), ArgoCD, GitHub Actions, Kong API Gateway, HashiCorp Vault
@@ -48,6 +38,8 @@ A production-grade microservices-based Loan Origination System for an Indian ban
 
 ### Prerequisites
 - Docker Desktop 4.x
+- Java 21+
+- Maven 3.9+
 - Node.js 20+
 
 ### 1. Clone and start
@@ -55,25 +47,32 @@ A production-grade microservices-based Loan Origination System for an Indian ban
 git clone <repo>
 cd los-platform
 
-# Start all services (includes DBs, Kafka, Redis, MinIO)
+# Start infrastructure (DBs, Kafka, Redis, MinIO)
 docker compose -f devops/docker/docker-compose.yml up -d
 
-# Run migrations
-bash database/migrations/migration-runner.sh --env dev
+# Build and run Spring Boot backend
+cd backend-java
+mvn package -DskipTests
+java -jar target/los-platform-1.0.0.jar
+
+# Or with Docker
+docker build -t los-platform backend-java
+docker run -p 8080:8080 --env-file backend-java/.env.local los-platform
 ```
 
-### 2. Seed data
+### 2. Start frontend
 ```bash
-docker exec -it los-backend psql -U los_user -d los_shared -f /seeds/00_seed_config.sql
+cd frontend
+npm install
+npm run dev
 ```
 
 ### 3. Access services
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:3000 |
-| Auth Service | http://localhost:3001 |
-| KYC Service | http://localhost:3002 |
-| Loan Service | http://localhost:3003 |
+| Spring Boot API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
 | Grafana | http://localhost:3009 |
 | Jaeger | http://localhost:16686 |
 
@@ -95,17 +94,25 @@ docker exec -it los-backend psql -U los_user -d los_shared -f /seeds/00_seed_con
 
 ```
 los-platform/
-├── backend/                    # NestJS monorepo
-│   ├── auth-service/          # Authentication
-│   ├── kyc-service/            # KYC & identity verification
-│   ├── loan-service/          # Loan applications & agreements
-│   ├── document-service/       # Document management
-│   ├── decision-engine/        # Credit decision engine
-│   ├── integration-service/    # Bureau, CBS, NACH, disbursement
-│   ├── notification-service/   # SMS/email notifications
-│   ├── dsa-service/            # DSA partner portal
-│   ├── common/                # Shared libs (Kafka, auth guards, metrics)
-│   └── test/                   # E2E tests (Jest + Supertest)
+├── backend-java/              # Spring Boot monolith
+│   ├── src/main/java/com/los/
+│   │   ├── LosApplication.java
+│   │   ├── auth/            # Authentication module
+│   │   ├── kyc/              # KYC & identity verification
+│   │   ├── loan/            # Loan applications & agreements
+│   │   ├── decision/         # Credit decision engine
+│   │   ├── integration/     # Bureau, CBS, NACH, disbursement
+│   │   ├── notification/    # SMS/email notifications
+│   │   ├── dsa/              # DSA partner portal
+│   │   ├── document/         # Document management
+│   │   ├── shared/           # Audit logs, idempotency
+│   │   └── common/           # Shared: config, security, utils, DTOs
+│   ├── src/main/resources/
+│   │   ├── application.yml   # Main config
+│   │   └── db/migration/    # Flyway migrations (V001–V009)
+│   ├── Dockerfile
+│   └── pom.xml
+├── backend/                    # NestJS monorepo (legacy, preserved)
 ├── frontend/                   # Next.js 14 app
 │   └── src/
 │       ├── app/               # App router pages
@@ -115,8 +122,8 @@ los-platform/
 │       ├── services/           # Service-specific API clients
 │       └── types/              # TypeScript type definitions
 ├── database/
-│   ├── migrations/            # Per-service SQL migrations (002–010)
-│   ├── schemas/                # Schema copies
+│   ├── init-databases.sql     # Creates single los_platform DB with 9 schemas
+│   └── migrations/            # Per-service SQL migrations (legacy)
 │   └── seeds/                  # Seed data (benchmark rates, rules, templates)
 ├── devops/
 │   ├── docker/                 # docker-compose.yml

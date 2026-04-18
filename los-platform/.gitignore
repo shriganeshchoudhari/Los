@@ -79,3 +79,9 @@ __consumer_offsets/
 
 # OpenAPI/specs auto-generated
 generated/
+
+
+# Java Build
+backend-java/target/
+.factorypath
+

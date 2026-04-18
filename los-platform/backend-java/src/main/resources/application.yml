@@ -1,0 +1,153 @@
+spring:
+  application:
+    name: los-platform
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:los_platform}
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+            #dialect: org.hibernate.community.dialect.PostgreSQLDialect
+        format_sql: false
+        default_schema: public
+        jdbc:
+          time_zone: UTC
+    open-in-view: false
+    show-sql: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    schemas: auth,kyc,loan,decision,integration,notification,dsa,document,shared,public
+
+  liquibase:
+    enabled: false
+
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 3
+    consumer:
+      group-id: los-platform
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
+
+  ldap:
+    urls: ${LDAP_URL:ldap://localhost:389}
+    base: ${LDAP_BASE_DN:dc=bank,dc=internal}
+    username: ${LDAP_BIND_DN:}
+    password: ${LDAP_BIND_PASSWORD:}
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+server:
+  port: 8082
+  servlet:
+    context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+los:
+  jwt:
+    public-key-file: ${JWT_PUBLIC_KEY_FILE:keys/jwt-public.pem}
+    private-key-file: ${JWT_PRIVATE_KEY_FILE:keys/jwt-private.pem}
+    issuer: los-platform
+    access-token-expiry-seconds: 900
+    refresh-token-expiry-days: 7
+  encryption:
+    master-key: ${ENCRYPTION_MASTER_KEY:default-key-replace-in-prod-32chars!}
+  otp:
+    ttl-seconds: 300
+    max-attempts: 3
+    max-per-hour: 10
+    max-concurrent-sessions: 3
+  redis:
+    otp-prefix: "otp:"
+    session-prefix: "session:"
+    blacklist-prefix: "blacklist:"
+  minio:
+    endpoint: ${MINIO_ENDPOINT:localhost}
+    port: ${MINIO_PORT:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:los-documents}
+  kyc:
+    uidai:
+      base-url: ${UIDAI_BASE_URL:https://www.uidai.gov.in}
+      asa-code: ${UIDAI_ASA_CODE:}
+      public-key: ${UIDAI_PUBLIC_KEY:}
+    nsdl:
+      base-url: ${NSDL_BASE_URL:https://panuti的服务/api}
+      api-key: ${NSDL_API_KEY:}
+    face-match:
+      url: ${FACE_MATCH_URL:https://faceverify.example.com}
+    digilocker:
+      client-id: ${DIGILOCKER_CLIENT_ID:}
+      client-secret: ${DIGILOCKER_CLIENT_SECRET:}
+      redirect-uri: ${DIGILOCKER_REDIRECT_URI:https://los.losbank.in/auth/digilocker/callback}
+
+logging:
+  level:
+    com.los: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+

@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 
 const AUTH_SERVICE_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001';
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:8081';
 const KYC_SERVICE_URL =
   process.env.NEXT_PUBLIC_KYC_SERVICE_URL || 'http://localhost:3002';
 const LOAN_SERVICE_URL =
@@ -90,7 +90,7 @@ function createServiceApi(baseURL: string, requiresAuth = true): AxiosInstance {
   return instance;
 }
 
-const authSvc = createServiceApi(AUTH_SERVICE_URL);
+const authSvc = createServiceApi(AUTH_SERVICE_URL, false);
 const kycSvc = createServiceApi(KYC_SERVICE_URL);
 const loanSvc = createServiceApi(LOAN_SERVICE_URL);
 const docSvc = createServiceApi(DOCUMENT_SERVICE_URL);

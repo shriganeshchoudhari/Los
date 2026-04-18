@@ -1,0 +1,55 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/los_platform
+    username: los_user
+    password: los_password
+
+  flyway:
+    schemas: auth,kyc,loan,decision,integration,notification,dsa,document,shared,public
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  data:
+    redis:
+      host: localhost
+
+  ldap:
+    urls: ldap://localhost:389
+    base: dc=bank,dc=internal
+
+los:
+  jwt:
+    public-key-file: ../backend/keys/jwt-public.pem
+    private-key-file: ../backend/keys/jwt-private.pem
+  seed:
+    enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      uidai:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      nsdl:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      cibil:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      bureau:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+
+logging:
+  level:
+    com.los: DEBUG
+    org.springframework.security: DEBUG

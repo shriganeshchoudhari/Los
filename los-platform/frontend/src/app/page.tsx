@@ -123,10 +123,12 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
 
   const product = LOAN_PRODUCTS.find(p => p.type === selectedProduct);
-  const formatCurrency = (n: number) => n >= 100_000 ? `₹${(n / 100_000).toFixed(0)}L` : `₹${n.toLocaleString('en-IN')}`;
+  const formatCurrency = (n: number) => (
+    n >= 100_000 ? `₹${(n / 100_000).toFixed(0)}L` : `₹${n.toLocaleString('en-IN')}`
+  );
   const maxAmount = product?.max || 0;
   const maxTenure = product?.maxTenure || 60;
-  const EMI = product ? Math.round((amount * (product.type === 'HOME_LOAN' ? 8.4 / 12 / 100 : 10.5 / 12 / 100) * Math.pow(1 + (product.type === 'HOME_LOAN' ? 8.4 : 10.5) / 12 / 100, tenure)) / (Math.pow(1 + (product.type === 'HOME_LOAN' ? 8.4 : 10.5) / 12 / 100, tenure) - 1) : 0;
+  const EMI = product ? Math.round((amount * (product.type === 'HOME_LOAN' ? 8.4 / 12 / 100 : 10.5 / 12 / 100) * Math.pow(1 + (product.type === 'HOME_LOAN' ? 8.4 : 10.5) / 12 / 100, tenure)) / (Math.pow(1 + (product.type === 'HOME_LOAN' ? 8.4 : 10.5) / 12 / 100, tenure) - 1)) : 0;
 
   const startApplication = async () => {
     if (!selectedProduct || amount < (product?.min || 0)) {
@@ -166,7 +168,7 @@ export default function HomePage() {
             <Link href="/help" className="hover:text-primary">Help</Link>
           </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm">Login</Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/login')}>Login</Button>
           </div>
         </div>
       </header>
