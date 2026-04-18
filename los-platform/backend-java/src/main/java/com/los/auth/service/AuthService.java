@@ -1,15 +1,12 @@
 package com.los.auth.service;
 
 import com.los.auth.dto.*;
-import com.los.auth.entity.OtpSession;
 import com.los.auth.entity.User;
-import com.los.auth.repository.OtpSessionRepository;
 import com.los.auth.repository.UserRepository;
 import com.los.common.dto.ApiResponse;
 import com.los.common.enums.UserRole;
 import com.los.common.enums.UserStatus;
 import com.los.common.exception.LosException;
-import com.los.common.util.CryptoUtil;
 import com.los.common.util.StringUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +24,6 @@ public class AuthService {
     private final OtpService otpService;
     private final TokenService tokenService;
     private final UserRepository userRepository;
-    private final OtpSessionRepository otpSessionRepository;
 
     public ApiResponse<java.util.Map<String, String>> sendOtp(SendOtpDto dto) {
         return otpService.sendOtp(dto);
@@ -40,7 +36,7 @@ public class AuthService {
 
         String mobileHash = com.los.common.util.CryptoUtil.hashMobile(dto.getMobile());
         User user = userRepository.findByMobileHash(mobileHash)
-            .orElseGet(() -> createNewUser(dto.getMobile(), mobileHash));
+                .orElseGet(() -> createNewUser(dto.getMobile(), mobileHash));
 
         if (user.getStatus() == UserStatus.LOCKED) {
             if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
@@ -60,11 +56,10 @@ public class AuthService {
         userRepository.save(user);
 
         LoginResponseDto response = tokenService.generateTokens(
-            user.getId(),
-            dto.getDeviceFingerprint(),
-            dto.getIpAddress(),
-            dto.getUserAgent()
-        );
+                user.getId(),
+                dto.getDeviceFingerprint(),
+                dto.getIpAddress(),
+                dto.getUserAgent());
 
         return ApiResponse.success(response, "Login successful");
     }
@@ -73,9 +68,8 @@ public class AuthService {
         log.info("Refreshing access token");
 
         LoginResponseDto response = tokenService.refreshAccessToken(
-            dto.getRefreshToken(),
-            dto.getDeviceFingerprint()
-        );
+                dto.getRefreshToken(),
+                dto.getDeviceFingerprint());
 
         return ApiResponse.success(response, "Token refreshed");
     }

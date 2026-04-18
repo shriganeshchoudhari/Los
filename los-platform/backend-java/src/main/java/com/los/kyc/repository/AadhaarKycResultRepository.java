@@ -8,10 +8,9 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.UUID;
 
 @Repository
-public interface AadhaarKycResultRepository extends JpaRepository<AadhaarKycResult, UUID> {
+public interface AadhaarKycResultRepository extends JpaRepository<AadhaarKycResult, String> {
     Optional<AadhaarKycResult> findByKycId(String kycId);
 
     @Query("SELECT a FROM AadhaarKycResult a WHERE a.aadhaarNumberHash = :hash AND a.verifiedAt > :cutoff ORDER BY a.verifiedAt DESC LIMIT 1")

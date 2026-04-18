@@ -27,9 +27,11 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const { data } = await authApi.sendOtp(mobile, 'LOGIN', channel);
-      setSessionId(data.sessionId);
-      setOtpExpiresAt(new Date(Date.now() + data.expiresIn * 1000));
+      const res = await authApi.sendOtp(mobile, 'LOGIN', channel);
+      // Backend wraps response: { success, data: { sessionId, expiresIn }, message }
+      const payload = res.data?.data ?? res.data;
+      setSessionId(payload.sessionId);
+      setOtpExpiresAt(new Date(Date.now() + (payload.expiresIn ?? 600) * 1000));
       setStep('OTP');
       setCountdown(300);
       toast.success(`OTP sent via ${channel === 'SMS' ? 'SMS' : 'WhatsApp'} to ${mobile.substring(0, 3)}XXXX${mobile.substring(8)}`);
@@ -48,14 +50,16 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const { data } = await authApi.verifyOtp(sessionId, mobile, otp);
+      const res = await authApi.verifyOtp(sessionId, mobile, otp);
+      // Backend wraps response: { success, data: { accessToken, refreshToken, expiresIn }, message }
+      const payload = res.data?.data ?? res.data;
       await fetch('/api/auth/callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          expiresIn: data.expiresIn ?? 900,
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken,
+          expiresIn: payload.expiresIn ?? 900,
         }),
       });
       toast.success('Login successful!');

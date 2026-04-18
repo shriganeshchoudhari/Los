@@ -7,7 +7,6 @@ import com.los.auth.repository.RefreshTokenRepository;
 import com.los.auth.repository.UserRepository;
 import com.los.common.exception.LosException;
 import com.los.common.security.JwtTokenProvider;
-import com.los.common.util.CryptoUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 @Slf4j

@@ -3,9 +3,7 @@ package com.los.kyc.service;
 import com.los.kyc.dto.KycDocumentDto;
 import com.los.kyc.entity.KycDocument;
 import com.los.kyc.repository.KycDocumentRepository;
-import com.los.kyc.repository.KycRecordRepository;
 import com.los.common.dto.ApiResponse;
-import com.los.common.exception.LosException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +19,6 @@ import java.util.List;
 public class KycDocumentService {
 
     private final KycDocumentRepository kycDocumentRepository;
-    private final KycRecordRepository kycRecordRepository;
 
     public ApiResponse<List<KycDocument>> getDocuments(String kycRecordId) {
         log.info("Getting documents for KYC record: {}", kycRecordId);

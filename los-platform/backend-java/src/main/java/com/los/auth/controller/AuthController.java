@@ -4,16 +4,14 @@ import com.los.auth.dto.*;
 import com.los.auth.service.AuthService;
 import com.los.auth.service.LdapAuthService;
 import com.los.common.dto.ApiResponse;
+import com.los.common.security.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +24,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final LdapAuthService ldapAuthService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * Send OTP to mobile number
@@ -140,13 +139,12 @@ public class AuthController {
     /**
      * Get JWKS for token validation
      */
-    @GetMapping("/.well-known/jwks")
+    @GetMapping("/.well-known/jwks.json")
     @Operation(summary = "Get JWKS", description = "Get JSON Web Key Set for token validation")
     public ResponseEntity<java.util.Map<String, Object>> getJwks() {
         log.debug("JWKS endpoint called");
-        // TODO: Implement JWKS endpoint
         return ResponseEntity.ok(java.util.Map.of(
-            "keys", java.util.List.of()
+            "keys", java.util.List.of(jwtTokenProvider.getPublicJwk())
         ));
     }
 

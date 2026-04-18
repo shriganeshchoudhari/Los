@@ -71,26 +71,26 @@ public class DsaController {
 
     @GetMapping("/resources/{partnerId}")
     @Operation(summary = "Get partner resources", description = "Get all resources for partner")
-    public ResponseEntity<ApiResponse<List<Object>>> getResources(
+    public ResponseEntity<ApiResponse<List<?>>> getResources(
             @PathVariable String partnerId) {
         log.info("GET /api/dsa/resources/{} - Fetching resources", partnerId);
 
         var resources = resourceService.getResourcesByPartner(partnerId);
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(ApiResponse.success((List) (List<?>) resources, "Resources retrieved successfully"));
+                .body(ApiResponse.success(resources, "Resources retrieved successfully"));
     }
 
     @GetMapping("/activities/{partnerId}")
     @Operation(summary = "Partner activities", description = "Get partner activities log")
-    public ResponseEntity<ApiResponse<List<Object>>> getActivities(
+    public ResponseEntity<ApiResponse<List<?>>> getActivities(
             @PathVariable String partnerId) {
         log.info("GET /api/dsa/activities/{} - Fetching activities", partnerId);
 
         var activities = activityTrackingService.getActivities(partnerId);
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(ApiResponse.success((List) (List<?>) activities, "Activities retrieved successfully"));
+                .body(ApiResponse.success(activities, "Activities retrieved successfully"));
     }
 
     @GetMapping("/reports/{partnerId}")

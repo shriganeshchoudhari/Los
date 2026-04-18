@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 
 const AUTH_SERVICE_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:8081';
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:8082/api';
 const KYC_SERVICE_URL =
   process.env.NEXT_PUBLIC_KYC_SERVICE_URL || 'http://localhost:3002';
 const LOAN_SERVICE_URL =

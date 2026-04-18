@@ -149,9 +149,10 @@ export function OTPDigitInput({ length = 6, value, onChange, autoFocus }: OTPDig
 
   const handleChange = (index: number, char: string) => {
     if (!/^\d*$/.test(char)) return;
-    const newValue = value.split('');
-    newValue[index] = char;
-    onChange(newValue.join(''));
+    // Pad the current value to `length` slots to avoid sparse arrays
+    const digits = Array.from({ length }, (_, i) => value[i] || '');
+    digits[index] = char.slice(-1); // accept only the last typed char
+    onChange(digits.join(''));
 
     if (char && index < length - 1) {
       inputRefs.current[index + 1]?.focus();

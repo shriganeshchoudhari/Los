@@ -41,11 +41,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<?>> handleValidationException(
             MethodArgumentNotValidException ex, WebRequest request) {
-        log.warn("Validation error: {}", ex.getMessage());
+        
+        // Build a descriptive message listing all field errors
+        String fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(java.util.stream.Collectors.joining("; "));
+        
+        String message = fieldErrors.isEmpty() ? "Validation failed" : "Validation failed: " + fieldErrors;
+        log.warn("Validation error on {}: {}", request.getDescription(false), message);
         
         ApiResponse<?> response = ApiResponse.error(
                 "GEN_004",
-                "Validation failed"
+                message
         );
         response.setTimestamp(java.time.LocalDateTime.now());
         response.setPath(request.getDescription(false).replace("uri=", ""));

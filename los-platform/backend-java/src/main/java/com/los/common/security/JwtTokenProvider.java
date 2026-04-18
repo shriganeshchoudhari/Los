@@ -2,12 +2,14 @@ package com.los.common.security;
 
 import com.los.common.exception.LosException;
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
+import jakarta.annotation.PostConstruct;
+import java.math.BigInteger;
+import java.security.interfaces.RSAPublicKey;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -46,6 +48,11 @@ public class JwtTokenProvider {
 
     private PrivateKey privateKey;
     private PublicKey publicKey;
+
+    @PostConstruct
+    public void init() {
+        initializeKeys();
+    }
 
     /**
      * Initialize keys from files (called on component initialization)
@@ -90,7 +97,7 @@ public class JwtTokenProvider {
                 .id(jti)
                 .issuedAt(new Date(now.toEpochMilli()))
                 .expiration(new Date(expiryTime.toEpochMilli()))
-                .signWith(privateKey, SignatureAlgorithm.RS256);
+                .signWith(privateKey);
 
         if (role != null) {
             builder.claim("role", role);
@@ -124,7 +131,7 @@ public class JwtTokenProvider {
         } catch (MalformedJwtException e) {
             log.warn("Invalid JWT token: {}", e.getMessage());
             throw new LosException("AUTH_005", "Invalid token", 401, false);
-        } catch (SignatureException e) {
+        } catch (JwtException e) {
             log.warn("Invalid JWT signature: {}", e.getMessage());
             throw new LosException("AUTH_005", "Invalid token signature", 401, false);
         } catch (IllegalArgumentException e) {
@@ -212,5 +219,35 @@ public class JwtTokenProvider {
         X509EncodedKeySpec spec = new X509EncodedKeySpec(decodedKey);
         KeyFactory factory = KeyFactory.getInstance("RSA");
         return factory.generatePublic(spec);
+    }
+
+    /**
+     * Get the public key in JWK format
+     */
+    public Map<String, Object> getPublicJwk() {
+        if (!(publicKey instanceof RSAPublicKey rsaPublicKey)) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> jwk = new LinkedHashMap<>();
+        jwk.put("kty", "RSA");
+        jwk.put("alg", "RS256");
+        jwk.put("use", "sig");
+        jwk.put("kid", "los-platform-key");
+        jwk.put("n", toBase64Url(rsaPublicKey.getModulus()));
+        jwk.put("e", toBase64Url(rsaPublicKey.getPublicExponent()));
+
+        return jwk;
+    }
+
+    private String toBase64Url(BigInteger value) {
+        byte[] bytes = value.toByteArray();
+        int offset = 0;
+        if (bytes[0] == 0 && bytes.length > 1) {
+            offset = 1;
+        }
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(
+            Arrays.copyOfRange(bytes, offset, bytes.length)
+        );
     }
 }

@@ -21,7 +21,6 @@ import java.util.UUID;
 public class KycService {
 
     private static final int FACE_MATCH_THRESHOLD = 70;
-    private static final int LIVENESS_THRESHOLD = 60;
     private static final int NAME_MATCH_THRESHOLD = 80;
 
     private final KycRecordRepository kycRecordRepository;
@@ -211,14 +210,6 @@ public class KycService {
         return consentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId);
     }
 
-    private KycRecord getOrCreateKycRecord(String applicationId) {
-        return kycRecordRepository.findByApplicationId(applicationId)
-                .orElseGet(() -> KycRecord.builder()
-                        .applicationId(applicationId)
-                        .userId(UUID.randomUUID().toString())
-                        .status(KycRecord.KycStatus.NOT_STARTED)
-                        .build());
-    }
 
     private KycStatusResponseDto formatKycStatus(KycRecord kycRecord) {
         Optional<AadhaarKycResult> aadhaarResult = aadhaarRepository.findByKycId(kycRecord.getId().toString());

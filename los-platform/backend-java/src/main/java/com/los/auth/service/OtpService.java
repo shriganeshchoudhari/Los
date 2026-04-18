@@ -5,13 +5,13 @@ import com.los.auth.dto.VerifyOtpDto;
 import com.los.auth.entity.OtpSession;
 import com.los.auth.repository.OtpSessionRepository;
 import com.los.common.dto.ApiResponse;
-import com.los.common.enums.OtpPurpose;
 import com.los.common.exception.LosException;
 import com.los.common.util.CryptoUtil;
 import com.los.common.util.StringUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 public class OtpService {
 
     private final OtpSessionRepository otpSessionRepository;
+    private final Environment environment;
 
     @Value("${los.otp.validity-minutes:10}")
     private int otpValidityMinutes;
@@ -53,6 +54,19 @@ public class OtpService {
         String otp = generateOtp();
         String sessionId = UUID.randomUUID().toString();
         String otpHash = CryptoUtil.hashOtp(otp);
+
+        // DEV-ONLY: Print OTP to console so developers can test without SMS integration
+        boolean isProd = java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod");
+        if (!isProd) {
+            log.warn("\n" +
+                "╔══════════════════════════════════════╗\n" +
+                "║         [DEV] OTP CONSOLE LOG        ║\n" +
+                "║  Mobile  : {}  ║\n" +
+                "║  OTP     : {}                        ║\n" +
+                "║  Session : {}  ║\n" +
+                "╚══════════════════════════════════════╝",
+                dto.getMobile(), otp, sessionId);
+        }
 
         OtpSession session = new OtpSession();
         session.setMobile(dto.getMobile());

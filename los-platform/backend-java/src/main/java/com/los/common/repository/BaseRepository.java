@@ -12,6 +12,6 @@ import org.springframework.data.repository.NoRepositoryBean;
  * @param <ID> The ID type
  */
 @NoRepositoryBean
-public interface BaseRepository<T extends BaseEntity, ID extends String> extends JpaRepository<T, ID> {
+public interface BaseRepository<T extends BaseEntity> extends JpaRepository<T, String> {
     // Inherits all standard CRUD operations from JpaRepository
 }
