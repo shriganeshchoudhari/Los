@@ -37,20 +37,26 @@ function addAuthToken(config: InternalAxiosRequestConfig): InternalAxiosRequestC
 }
 
 function handleError(error: AxiosError<{ message?: string; code?: string }>): Promise<never> {
-  if (error.response?.status === 409) {
+  const status = error.response?.status;
+  if (status === 409) {
     toast.error('Version conflict — please refresh and try again.');
   }
-  if (error.response?.status === 429) {
+  if (status === 429) {
     toast.error('Too many requests. Please wait a moment.');
   }
-  if (error.response?.status >= 500) {
+  if (status && status >= 500) {
     toast.error('Server error. Please try again later.');
   }
   return Promise.reject(error);
 }
 
 function createServiceApi(baseURL: string, requiresAuth = true): AxiosInstance {
-  const instance = axios.create({ baseURL, timeout: 30_000, headers: { 'Content-Type': 'application/json' } });
+  const instance = axios.create({ 
+    baseURL, 
+    timeout: 30_000, 
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true 
+  });
 
   instance.interceptors.request.use((config) => {
     config = addCorrelationId(config);

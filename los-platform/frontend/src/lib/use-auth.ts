@@ -123,13 +123,23 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
+      // 1. Call the backend logout (8082) if needed
       const { authApi } = await import('./api');
       await authApi.logout();
     } catch {
-      // ignore network errors on logout
+      // ignore network errors
     } finally {
+      try {
+        // 2. Call the Next.js API route to clear HttpOnly cookies
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // ignore errors
+      }
+      
+      // 3. Clear any remaining client-side cookies
       Cookies.remove('access_token');
       Cookies.remove('refresh_token');
+      
       setUser(null);
       setIsAuthenticated(false);
       router.push('/login');

@@ -27,7 +27,8 @@ public class GlobalExceptionHandler {
         
         ApiResponse<?> response = ApiResponse.error(
                 ex.getCode(),
-                ex.getMessage()
+                ex.getMessage(),
+                ex.getData()
         );
         response.setTimestamp(java.time.LocalDateTime.now());
         response.setPath(request.getDescription(false).replace("uri=", ""));
@@ -79,6 +80,26 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle Database integrity violations
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleDataIntegrityViolationException(
+            org.springframework.dao.DataIntegrityViolationException ex, WebRequest request) {
+        log.error("Data integrity violation: {}", ex.getMessage(), ex);
+        
+        String message = "Database constraint violation";
+        if (ex.getMessage() != null && ex.getMessage().contains("value too long")) {
+            message = "Input value is too long for database column";
+        }
+        
+        ApiResponse<?> response = ApiResponse.error("GEN_003", message);
+        response.setTimestamp(java.time.LocalDateTime.now());
+        response.setPath(request.getDescription(false).replace("uri=", ""));
+        
+        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
      * Handle RuntimeException
      */
     @ExceptionHandler(RuntimeException.class)
@@ -88,7 +109,7 @@ public class GlobalExceptionHandler {
         
         ApiResponse<?> response = ApiResponse.error(
                 "GEN_001",
-                "An unexpected error occurred"
+                "An unexpected error occurred: " + ex.getMessage()
         );
         response.setTimestamp(java.time.LocalDateTime.now());
         response.setPath(request.getDescription(false).replace("uri=", ""));
@@ -105,7 +126,7 @@ public class GlobalExceptionHandler {
         
         ApiResponse<?> response = ApiResponse.error(
                 "GEN_001",
-                "An unexpected error occurred"
+                "An unexpected error occurred: " + ex.getMessage()
         );
         response.setTimestamp(java.time.LocalDateTime.now());
         response.setPath(request.getDescription(false).replace("uri=", ""));

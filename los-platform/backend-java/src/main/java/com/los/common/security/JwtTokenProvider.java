@@ -1,9 +1,9 @@
 package com.los.common.security;
 
+import com.los.common.config.LosProperties;
 import com.los.common.exception.LosException;
 import io.jsonwebtoken.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -31,69 +31,63 @@ import java.util.*;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${jwt.private-key-path:keys/private_key.pem}")
-    private String privateKeyPath;
-
-    @Value("${jwt.public-key-path:keys/public_key.pem}")
-    private String publicKeyPath;
-
-    @Value("${jwt.issuer:los-platform}")
-    private String issuer;
-
-    @Value("${jwt.access-token-expiry:900}")
-    private long accessTokenExpirySeconds;
-
-    @Value("${jwt.refresh-token-expiry:604800}")
-    private long refreshTokenExpirySeconds;
-
+    private final LosProperties losProperties;
     private PrivateKey privateKey;
     private PublicKey publicKey;
 
-    @PostConstruct
-    public void init() {
-        initializeKeys();
+    public JwtTokenProvider(LosProperties losProperties) {
+        this.losProperties = losProperties;
     }
 
-    /**
-     * Initialize keys from files (called on component initialization)
-     */
-    public void initializeKeys() {
+    @PostConstruct
+    public void init() {
         try {
-            this.privateKey = loadPrivateKey();
-            this.publicKey = loadPublicKey();
+            loadKeys();
             log.info("JWT keys initialized successfully");
         } catch (Exception e) {
-            log.error("Failed to initialize JWT keys", e);
-            throw new RuntimeException("JWT key initialization failed", e);
+            log.error("Failed to load JWT keys: {}", e.getMessage(), e);
+            throw new RuntimeException("Could not initialize JWT keys", e);
         }
+    }
+
+    private void loadKeys() throws Exception {
+        String privPath = losProperties.getJwt().getPrivateKeyPath();
+        String pubPath = losProperties.getJwt().getPublicKeyPath();
+
+        if (privPath == null || pubPath == null) {
+            throw new IllegalStateException("JWT private/public key paths must be configured in los.jwt.*");
+        }
+
+        this.privateKey = loadPrivateKey(privPath);
+        this.publicKey = loadPublicKey(pubPath);
     }
 
     /**
      * Generate an access token
      */
     public String generateAccessToken(String userId, String role, String sessionId, List<String> scopes) {
-        return generateToken(userId, role, sessionId, scopes, accessTokenExpirySeconds);
+        return generateToken(userId, role, sessionId, scopes, losProperties.getJwt().getAccessTokenExpiry());
     }
 
     /**
      * Generate a refresh token
      */
     public String generateRefreshToken(String userId) {
-        return generateToken(userId, null, null, null, refreshTokenExpirySeconds);
+        return generateToken(userId, null, null, null, losProperties.getJwt().getRefreshTokenExpiry());
     }
 
     /**
      * Generate JWT token with RS256
      */
-    private String generateToken(String userId, String role, String sessionId, 
-                                List<String> scopes, long expirySeconds) {
+    private String generateToken(String userId, String role, String sessionId,
+            List<String> scopes, long expirySeconds) {
         Instant now = Instant.now();
         Instant expiryTime = now.plusSeconds(expirySeconds);
         String jti = UUID.randomUUID().toString();
 
         JwtBuilder builder = Jwts.builder()
                 .subject(userId)
-                .issuer(issuer)
+                .issuer(losProperties.getJwt().getIssuer())
                 .id(jti)
                 .issuedAt(new Date(now.toEpochMilli()))
                 .expiration(new Date(expiryTime.toEpochMilli()))
@@ -194,8 +188,9 @@ public class JwtTokenProvider {
     /**
      * Load private key from PEM file
      */
-    private PrivateKey loadPrivateKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String privateKeyPem = new String(Files.readAllBytes(Paths.get(privateKeyPath)))
+    private PrivateKey loadPrivateKey(String path)
+            throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String privateKeyPem = new String(Files.readAllBytes(Paths.get(path)))
                 .replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s", "");
@@ -209,8 +204,8 @@ public class JwtTokenProvider {
     /**
      * Load public key from PEM file
      */
-    private PublicKey loadPublicKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String publicKeyPem = new String(Files.readAllBytes(Paths.get(publicKeyPath)))
+    private PublicKey loadPublicKey(String path) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        String publicKeyPem = new String(Files.readAllBytes(Paths.get(path)))
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
@@ -247,7 +242,6 @@ public class JwtTokenProvider {
             offset = 1;
         }
         return Base64.getUrlEncoder().withoutPadding().encodeToString(
-            Arrays.copyOfRange(bytes, offset, bytes.length)
-        );
+                Arrays.copyOfRange(bytes, offset, bytes.length));
     }
 }

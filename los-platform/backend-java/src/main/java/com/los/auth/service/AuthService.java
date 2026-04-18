@@ -92,6 +92,23 @@ public class AuthService {
         return ApiResponse.success(null, "All sessions revoked");
     }
 
+    public ApiResponse<AuthenticatedUserDto> getProfile(String userId) {
+        log.debug("Fetching profile for user: {}", userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new LosException("AUTH_007", "User not found", 404, false));
+
+        AuthenticatedUserDto dto = new AuthenticatedUserDto();
+        dto.setUserId(user.getId());
+        dto.setName(user.getFirstName() != null ? user.getFirstName() + " " + (user.getLastName() != null ? user.getLastName() : "") : user.getMobile());
+        dto.setMobile(user.getMobile());
+        dto.setEmail(user.getEmail());
+        dto.setRole(user.getRole().name());
+        // permissions can be added here if needed
+        dto.setLoginTime(user.getLastLoginAt());
+        
+        return ApiResponse.success(dto, "Profile retrieved successfully");
+    }
+
     private User createNewUser(String mobile, String mobileHash) {
         log.info("Creating new user for mobile: {}", StringUtil.maskMobile(mobile));
 

@@ -14,29 +14,22 @@ public class LosException extends RuntimeException {
     private final Integer retryAfterSeconds;
     private final String field;
     private final String details;
+    private final Object data;
 
     public LosException(String code, String message, int httpStatus, boolean retryable) {
-        super(message);
-        this.code = code;
-        this.httpStatus = httpStatus;
-        this.retryable = retryable;
-        this.retryAfterSeconds = null;
-        this.field = null;
-        this.details = null;
+        this(code, message, httpStatus, retryable, null, null, null, null);
+    }
+
+    public LosException(String code, String message, int httpStatus, boolean retryable, Object data) {
+        this(code, message, httpStatus, retryable, null, null, null, data);
     }
 
     public LosException(String code, String message, int httpStatus, boolean retryable, Integer retryAfterSeconds) {
-        super(message);
-        this.code = code;
-        this.httpStatus = httpStatus;
-        this.retryable = retryable;
-        this.retryAfterSeconds = retryAfterSeconds;
-        this.field = null;
-        this.details = null;
+        this(code, message, httpStatus, retryable, retryAfterSeconds, null, null, null);
     }
 
     public LosException(String code, String message, int httpStatus, boolean retryable, 
-                       Integer retryAfterSeconds, String field, String details) {
+                       Integer retryAfterSeconds, String field, String details, Object data) {
         super(message);
         this.code = code;
         this.httpStatus = httpStatus;
@@ -44,5 +37,6 @@ public class LosException extends RuntimeException {
         this.retryAfterSeconds = retryAfterSeconds;
         this.field = field;
         this.details = details;
+        this.data = data;
     }
 }

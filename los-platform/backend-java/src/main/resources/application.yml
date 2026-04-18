@@ -108,11 +108,11 @@ springdoc:
 
 los:
   jwt:
-    public-key-file: ${JWT_PUBLIC_KEY_FILE:keys/jwt-public.pem}
-    private-key-file: ${JWT_PRIVATE_KEY_FILE:keys/jwt-private.pem}
+    public-key-path: ${JWT_PUBLIC_KEY_PATH:keys/public_key.pem}
+    private-key-path: ${JWT_PRIVATE_KEY_PATH:keys/private_key.pem}
     issuer: los-platform
-    access-token-expiry-seconds: 900
-    refresh-token-expiry-days: 7
+    access-token-expiry: 900
+    refresh-token-expiry: 604800
   encryption:
     master-key: ${ENCRYPTION_MASTER_KEY:default-key-replace-in-prod-32chars!}
   otp:

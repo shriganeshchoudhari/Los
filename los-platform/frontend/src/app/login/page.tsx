@@ -36,8 +36,19 @@ export default function LoginPage() {
       setCountdown(300);
       toast.success(`OTP sent via ${channel === 'SMS' ? 'SMS' : 'WhatsApp'} to ${mobile.substring(0, 3)}XXXX${mobile.substring(8)}`);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      toast.error(error.response?.data?.message || 'Failed to send OTP. Please try again.');
+      const error = err as { response?: { data?: { code?: string, message?: string, data?: { sessionId: string, expiresIn: number } } } };
+      const errCode = error.response?.data?.code;
+      const errData = error.response?.data?.data;
+
+      if (errCode === 'AUTH_013' && errData?.sessionId) {
+        toast.info('Using existing active session');
+        setSessionId(errData.sessionId);
+        setOtpExpiresAt(new Date(Date.now() + (errData.expiresIn || 300) * 1000));
+        setStep('OTP');
+        setCountdown(errData.expiresIn || 300);
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to send OTP. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

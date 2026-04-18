@@ -115,4 +115,28 @@ public class LoanApplicationService {
 
         return ApiResponse.success(null, "Application submitted successfully");
     }
+
+    public ApiResponse<org.springframework.data.domain.Page<ApplicationResponseDto>> getAllApplications(org.springframework.data.domain.Pageable pageable) {
+        log.info("Fetching paginated loan applications");
+        org.springframework.data.domain.Page<LoanApplication> page = loanApplicationRepository.findAll(pageable);
+        
+        org.springframework.data.domain.Page<ApplicationResponseDto> dtoPage = page.map(app -> {
+            ApplicationResponseDto dto = new ApplicationResponseDto();
+            dto.setApplicationId(app.getId());
+            dto.setApplicationNumber(app.getApplicationNumber());
+            dto.setStatus(app.getStatus());
+            dto.setCreatedAt(app.getCreatedAt());
+            
+            // Add useful data for the list view
+            java.util.Map<String, Object> data = new java.util.HashMap<>();
+            data.put("loanType", app.getLoanType());
+            data.put("amount", app.getRequestedAmount());
+            data.put("customerId", app.getCustomerId());
+            dto.setData(data);
+            
+            return dto;
+        });
+
+        return ApiResponse.success(dtoPage, "Applications retrieved successfully");
+    }
 }

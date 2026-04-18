@@ -148,6 +148,21 @@ public class AuthController {
         ));
     }
 
+    /**
+     * Get current user profile
+     */
+    @GetMapping("/profile")
+    @Operation(summary = "Get Profile", description = "Get current authenticated user's profile information")
+    public ResponseEntity<ApiResponse<AuthenticatedUserDto>> getProfile() {
+        Object principal = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof com.los.common.security.AuthenticatedUser authenticatedUser)) {
+            throw new com.los.common.exception.LosException("AUTH_008", "Not authenticated", 401, false);
+        }
+        
+        ApiResponse<AuthenticatedUserDto> response = authService.getProfile(authenticatedUser.getId());
+        return ResponseEntity.ok(response);
+    }
+
     private String getClientIp(HttpServletRequest request) {
         String clientIp = request.getHeader("X-Forwarded-For");
         if (clientIp == null || clientIp.isEmpty() || "unknown".equalsIgnoreCase(clientIp)) {

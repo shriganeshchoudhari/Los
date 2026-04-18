@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ApplicationCard, StatusBadge } from '@/components/ui/components';
 import { loanApi } from '@/lib/api';
 import { formatCurrency, timeAgo } from '@/lib/utils';
+import { useAuth } from '@/lib/use-auth';
 
 type Tab = 'ALL' | 'MY_QUEUE' | 'PENDING_DOCS' | 'PENDING_APPROVAL' | 'SANCTIONED';
 
@@ -20,15 +21,9 @@ const TABS: { key: Tab; label: string; color: string }[] = [
   { key: 'SANCTIONED', label: 'Sanctioned', color: 'bg-green-500' },
 ];
 
-const STATS_CARDS = [
-  { label: 'Total Applications', value: 0, change: '+12%', icon: '📋' },
-  { label: 'In Progress', value: 0, change: '-5%', icon: '⏳' },
-  { label: 'Approved This Month', value: 0, change: '+23%', icon: '✅' },
-  { label: 'Avg TAT', value: '4.2d', change: '-18%', icon: '⚡' },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('ALL');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -61,8 +56,8 @@ export default function DashboardPage() {
 
   const stats = {
     total,
-    inProgress: applications.filter((a: Record<string, unknown>) => ['SUBMITTED', 'KYC_COMPLETE', 'DOCUMENT_COLLECTION', 'CREDIT_ASSESSMENT'].includes(a.status as string)).length,
-    approved: applications.filter((a: Record<string, unknown>) => ['SANCTIONED', 'DISBURSED'].includes(a.status as string)).length,
+    inProgress: applications.filter((a: any) => ['SUBMITTED', 'KYC_COMPLETE', 'DOCUMENT_COLLECTION', 'CREDIT_ASSESSMENT'].includes(a.status as string)).length,
+    approved: applications.filter((a: any) => ['SANCTIONED', 'DISBURSED'].includes(a.status as string)).length,
   };
 
   return (
@@ -88,8 +83,10 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium">{profile?.fullName ?? 'Loading...'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.role ? profile.role.replace(/_/g, ' ') : '—'}</p>
               </div>
-              <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">AK</div>
-              <Button variant="ghost" size="sm">Logout</Button>
+              <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">
+                {profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '??'}
+              </div>
+              <Button variant="ghost" size="sm" onClick={logout}>Logout</Button>
             </div>
           </div>
         </div>
@@ -199,50 +196,41 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div id="application-list" role="tabpanel" aria-label="Application results" className="space-y-3">
-                {applications.map((app: Record<string, unknown>) => (
+                {applications.map((app: any) => (
                   <div
-                    key={app.id as string}
+                    key={app.id}
                     className="flex items-center gap-4 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/application/${app.id as string}`)}
+                    onClick={() => router.push(`/application/${app.id}`)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs text-muted-foreground">{app.applicationNumber as string}</span>
-                        <StatusBadge status={app.status as string} />
+                        <span className="font-mono text-xs text-muted-foreground">{app.applicationNumber}</span>
+                        <StatusBadge status={app.status} />
                       </div>
-                      <h4 className="font-semibold truncate">{app.applicantName as string}</h4>
+                      <h4 className="font-semibold truncate">{app.applicantName}</h4>
                       <p className="text-xs text-muted-foreground">
-                        {(app.loanType as string).replace(/_/g, ' ')} • {timeAgo(app.updatedAt as string)}
+                        {(app.loanType || '').replace(/_/g, ' ')} • {timeAgo(app.updatedAt)}
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-semibold">{formatCurrency(app.requestedAmount as number)}</p>
-                      {app.sanctionedAmount && (
-                        <p className="text-xs text-green-600">Sanctioned: {formatCurrency(app.sanctionedAmount as number)}</p>
-                      )}
+                      <p className="text-sm font-semibold">{formatCurrency(app.requestedAmount)}</p>
                     </div>
-                    <svg className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   </div>
                 ))}
-              </div>
-            )}
-
-            {total > 20 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
-                  Previous
-                </Button>
-                <span className="flex items-center px-3 text-sm">Page {page} of {Math.ceil(total / 20)}</span>
-                <Button variant="outline" size="sm" disabled={page >= Math.ceil(total / 20)} onClick={() => setPage(p => p + 1)}>
-                  Next
-                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </main>
     </div>
+  );
+}
+
+function ChevronRight(props: any) {
+  return (
+    <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
   );
 }

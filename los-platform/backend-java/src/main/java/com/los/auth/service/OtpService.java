@@ -46,9 +46,14 @@ public class OtpService {
 
         String mobileHash = CryptoUtil.hashMobile(dto.getMobile());
 
-        int activeSessions = otpSessionRepository.countActiveSessions(mobileHash, LocalDateTime.now());
-        if (activeSessions > 0) {
-            throw new LosException("AUTH_013", "OTP already sent. Please try after some time.", 429, true);
+        java.util.List<OtpSession> activeSessions = otpSessionRepository.findActiveSessions(mobileHash, LocalDateTime.now());
+        if (!activeSessions.isEmpty()) {
+            OtpSession existing = activeSessions.get(0);
+            throw new LosException("AUTH_013", "OTP already sent. Please try after some time.", 429, true, 
+                                 java.util.Map.of(
+                                     "sessionId", existing.getSessionId(),
+                                     "expiresIn", java.time.Duration.between(LocalDateTime.now(), existing.getExpiresAt()).getSeconds()
+                                 ));
         }
 
         String otp = generateOtp();

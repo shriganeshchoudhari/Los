@@ -18,11 +18,11 @@ public class LosProperties {
 
     @Data
     public static class Jwt {
-        private String publicKeyFile;
-        private String privateKeyFile;
+        private String publicKeyPath;
+        private String privateKeyPath;
         private String issuer;
-        private int accessTokenExpirySeconds;
-        private int refreshTokenExpiryDays;
+        private long accessTokenExpiry;
+        private long refreshTokenExpiry;
     }
 
     @Data
