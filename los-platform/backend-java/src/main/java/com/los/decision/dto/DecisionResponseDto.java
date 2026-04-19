@@ -21,7 +21,7 @@ public class DecisionResponseDto {
 
     private DecisionType decisionType;
 
-    private String finalDecision;
+    private String decision;
 
     private BigDecimal approvedAmount;
 

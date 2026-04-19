@@ -117,14 +117,23 @@ public class TokenService {
     }
 
     public void revokeToken(String tokenOrJti, String reason) {
-        log.info("Revoking token: {}", tokenOrJti);
+        log.info("Revoking token");
 
+        RefreshToken token = null;
+
+        // 1. Try treating it as a raw token (search by hash)
         String tokenHash = com.los.common.util.CryptoUtil.sha256(tokenOrJti);
-        RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
-            .orElseGet(() -> refreshTokenRepository.findById(tokenOrJti).orElse(null));
+        token = refreshTokenRepository.findByTokenHash(tokenHash).orElse(null);
+
+        // 2. If not found and it looks like a JTI/UUID (short string), try searching by ID/JTI
+        if (token == null && tokenOrJti != null && tokenOrJti.length() <= 64) {
+            token = refreshTokenRepository.findByJti(tokenOrJti)
+                .orElseGet(() -> refreshTokenRepository.findById(tokenOrJti).orElse(null));
+        }
 
         if (token == null) {
-            throw new LosException("AUTH_009", "Token not found", 404, false);
+            log.warn("Token revocation skipped: No RefreshToken found for provided identifier. This is normal if the token is already expired or invalid.");
+            return; // Don't throw exception, fail gracefully to allow logout flow to continue
         }
 
         token.setIsRevoked(true);

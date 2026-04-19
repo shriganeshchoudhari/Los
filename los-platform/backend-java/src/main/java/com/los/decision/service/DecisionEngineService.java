@@ -71,8 +71,8 @@ public class DecisionEngineService {
         DecisionStatus previousStatus = decision.getStatus();
         
         decision.setStatus(dto.getStatus());
-        decision.setFinalDecision(dto.getFinalDecision());
-        decision.setRejectionReason(dto.getRejectionReason());
+        decision.setFinalDecision(dto.getDecision());
+        decision.setRejectionReason(dto.getRejectionReasonCode());
         decision.setRemarks(dto.getRemarks());
         decision.setDecidedBy(userId);
         decision.setDecidedAt(LocalDateTime.now());
@@ -160,7 +160,7 @@ public class DecisionEngineService {
         dto.setApplicationId(decision.getApplicationId());
         dto.setStatus(decision.getStatus());
         dto.setDecisionType(decision.getDecisionType());
-        dto.setFinalDecision(decision.getFinalDecision());
+        dto.setDecision(decision.getFinalDecision());
         dto.setApprovedAmount(decision.getApprovedAmount());
         dto.setApprovedTenureMonths(decision.getApprovedTenureMonths());
         dto.setInterestRateBps(decision.getInterestRateBps());

@@ -79,7 +79,7 @@ export interface DecisionResult {
   id: UUID;
   applicationId: UUID;
   status: DecisionStatus;
-  finalDecision: 'APPROVE' | 'REJECT' | 'MANUAL';
+  decision: 'APPROVE' | 'REJECT' | 'MANUAL';
   approvedAmount?: PaisaAmount;
   approvedTenureMonths?: number;
   interestRateType: 'FIXED' | 'FLOATING';
@@ -103,14 +103,13 @@ export interface DecisionResult {
 export interface TriggerDecisionRequest {
   applicationId: UUID;
   forceRerun?: boolean;
-  overrideNotes?: string;
-  // Canonical field name per OpenAPI contract
   contextData?: string;
 }
 
 export interface ManualDecisionRequest {
   applicationId: UUID;
-  decision: 'APPROVE' | 'REJECT';
+  status: DecisionStatus;
+  decision: 'APPROVE' | 'REJECT'; // Renamed from finalDecision
   approvedAmount?: PaisaAmount;
   approvedTenureMonths?: number;
   rateOfInterestBps?: number;
@@ -123,7 +122,7 @@ export interface ManualDecisionRequest {
 export interface DecisionResponseDto {
   applicationId: UUID;
   status: DecisionStatus;
-  finalDecision: 'APPROVE' | 'REJECT' | 'MANUAL';
+  decision: 'APPROVE' | 'REJECT' | 'MANUAL'; // Renamed from finalDecision
   approvedAmount?: PaisaAmount;
   approvedTenureMonths?: number;
   rejectionReasonCode?: RejectionReasonCode;

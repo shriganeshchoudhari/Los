@@ -18,7 +18,6 @@ public class TriggerDecisionDto {
     @NotNull(message = "Force rerun flag is required")
     private Boolean forceRerun = false;
 
-    // Accepts alternate field name from frontend: overrideNotes -> contextData
-    @JsonAlias({"overrideNotes"})
+    // Canonical field: contextData
     private String contextData;
 }

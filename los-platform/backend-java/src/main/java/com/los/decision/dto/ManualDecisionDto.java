@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonAlias;
 
 @Data
 @NoArgsConstructor
@@ -15,18 +14,14 @@ public class ManualDecisionDto {
     @NotBlank(message = "Application ID is required")
     private String applicationId;
 
-    // Frontend uses 'decision' for final outcome. Status can be omitted by the
-    // frontend.
+    @jakarta.validation.constraints.NotNull(message = "Decision status is required")
     private DecisionStatus status;
 
-    @NotBlank(message = "Final decision is required")
-    @JsonAlias({ "decision" })
-    private String finalDecision;
+    @NotBlank(message = "Final decision value is required")
+    private String decision; // Renamed from finalDecision to align with entity and OpenAPI surface
 
     private String remarks;
 
-    // Accepts rejectionReasonCode from frontend as alias for backend
-    // rejectionReason
-    @JsonAlias({ "rejectionReasonCode" })
-    private String rejectionReason;
+    // Primary field for rejection reasons as per contract
+    private String rejectionReasonCode;
 }

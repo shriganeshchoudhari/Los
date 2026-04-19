@@ -56,7 +56,7 @@ public class DecisionController {
             @Valid @RequestBody ManualDecisionDto dto) {
         log.info("POST /api/decisions/override - Application: {}", dto.getApplicationId());
 
-        DecisionResponseDto response = decisionEngineService.manualOverride(dto, "SYSTEM_USER");
+        DecisionResponseDto response = decisionEngineService.manualOverride(dto, com.los.common.security.SecurityConstants.SYSTEM_USER);
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.success(response, "Decision overridden successfully"));
@@ -68,7 +68,7 @@ public class DecisionController {
             @Valid @RequestBody OverrideRequestDto dto) {
         log.info("POST /api/decisions/override/request - Application: {}", dto.getApplicationId());
 
-        DecisionResponseDto response = decisionEngineService.requestOverride(dto, "SYSTEM_USER");
+        DecisionResponseDto response = decisionEngineService.requestOverride(dto, com.los.common.security.SecurityConstants.SYSTEM_USER);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Override request created successfully"));

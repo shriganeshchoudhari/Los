@@ -73,7 +73,7 @@ export interface BureauPullCompletedEvent {
 export interface DecisionCompletedEvent {
   applicationId: UUID;
   decisionId: UUID;
-  finalDecision: 'APPROVE' | 'REJECT' | 'MANUAL';
+  decision: 'APPROVE' | 'REJECT' | 'MANUAL';
   approvedAmount?: PaisaAmount;
   rateOfInterestBps?: number;
 }

@@ -1,24 +1,18 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
 
-const AUTH_SERVICE_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:8082/api';
-const KYC_SERVICE_URL =
-  process.env.NEXT_PUBLIC_KYC_SERVICE_URL || 'http://localhost:8082/api';
-const LOAN_SERVICE_URL =
-  process.env.NEXT_PUBLIC_LOAN_SERVICE_URL || 'http://localhost:8082/api';
-const DOCUMENT_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DOCUMENT_SERVICE_URL || 'http://localhost:8082/api';
-const DECISION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DECISION_SERVICE_URL || 'http://localhost:8082/api';
-const INTEGRATION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_INTEGRATION_SERVICE_URL || 'http://localhost:8082/api';
-const NOTIFICATION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL || 'http://localhost:8082/api';
-const DSA_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DSA_SERVICE_URL || 'http://localhost:8082/api';
-const GATEWAY_URL =
-  process.env.NEXT_PUBLIC_API_GATEWAY_URL || '';
+// Evaluate URLs dynamically to support potential changes at runtime (though usually static in build-time Next.js)
+const getBaseURL = (envVar: string, fallback: string) => 
+  (typeof process !== 'undefined' && process.env[envVar]) || fallback;
+
+const AUTH_SERVICE_URL = getBaseURL('NEXT_PUBLIC_AUTH_SERVICE_URL', 'http://localhost:8082/api');
+const KYC_SERVICE_URL = getBaseURL('NEXT_PUBLIC_KYC_SERVICE_URL', 'http://localhost:8082/api');
+const LOAN_SERVICE_URL = getBaseURL('NEXT_PUBLIC_LOAN_SERVICE_URL', 'http://localhost:8082/api');
+const DOCUMENT_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DOCUMENT_SERVICE_URL', 'http://localhost:8082/api');
+const DECISION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DECISION_SERVICE_URL', 'http://localhost:8082/api');
+const INTEGRATION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_INTEGRATION_SERVICE_URL', 'http://localhost:8082/api');
+const NOTIFICATION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_NOTIFICATION_SERVICE_URL', 'http://localhost:8082/api');
+const DSA_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DSA_SERVICE_URL', 'http://localhost:8082/api');
 
 function addCorrelationId(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -29,15 +23,25 @@ function addCorrelationId(config: InternalAxiosRequestConfig): InternalAxiosRequ
 
 function handleError(error: AxiosError<{ message?: string; code?: string }>): Promise<never> {
   const status = error.response?.status;
-  if (status === 409) {
+  const message = error.response?.data?.message || 'An unexpected error occurred.';
+
+  if (status === 401) {
+    // 401 is primarily handled by the interceptor, but we fallback here if needed
+    console.warn('Unauthorized access — redirecting or refreshing...');
+  } else if (status === 403) {
+    toast.error('Permission denied: You do not have access to this resource.');
+  } else if (status === 404) {
+    toast.error('Resource not found.');
+  } else if (status === 409) {
     toast.error('Version conflict — please refresh and try again.');
-  }
-  if (status === 429) {
+  } else if (status === 422) {
+    toast.error(`Validation error: ${message}`);
+  } else if (status === 429) {
     toast.error('Too many requests. Please wait a moment.');
-  }
-  if (status && status >= 500) {
+  } else if (status && status >= 500) {
     toast.error('Server error. Please try again later.');
   }
+  
   return Promise.reject(error);
 }
 
@@ -62,17 +66,13 @@ function createServiceApi(baseURL: string, requiresAuth = true): AxiosInstance {
       if (error.response?.status === 401 && !originalRequest._retry && requiresAuth) {
         originalRequest._retry = true;
         try {
-          // Call the Next.js proxy route that reads the httpOnly refresh_token cookie
           const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
           if (refreshRes.ok) {
-            // Cookies are updated by the server route automatically
-            // Just retry the original request — the browser sends the new httpOnly access_token cookie
             return instance(originalRequest);
           }
         } catch {
-          // network error during refresh
+          // ignore network error
         }
-        // Refresh failed — redirect to login
         if (typeof window !== 'undefined') window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -165,8 +165,13 @@ export const decisionApi = {
   trigger: (applicationId: string) =>
     decisionSvc.post(`/decisions/trigger`, { applicationId }),
   get: (applicationId: string) => decisionSvc.get(`/decisions/${applicationId}`),
-  override: (applicationId: string, decision: string, reason: string) =>
-    decisionSvc.post('/decisions/override', { applicationId, decision, reason }),
+  override: (applicationId: string, decision: string, status: string, reason: string) =>
+    decisionSvc.post('/decisions/override', { 
+      applicationId, 
+      decision, 
+      status, 
+      remarks: reason 
+    }),
 };
 
 export const disbursementApi = {

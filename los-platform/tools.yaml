@@ -1,4 +1,4 @@
-# Google MCP Toolbox - Corrected Schema
+# Google MCP Toolbox - LOS Platform Core Tools
 sources:
   - name: "los-platform"
     type: "postgres"
@@ -6,16 +6,65 @@ sources:
       connection_string: "postgresql://postgres:postgres@localhost:5432/los_platform"
 
 tools:
-  - name: "get_loan_status"
-    description: "Check the status of a loan application by ID."
+  # Customer & User Management
+  - name: "list_users"
+    description: "List all active internal users with their roles and contact details."
     source: "los-platform"
-    statement: "SELECT status, applicant_name, amount FROM loans WHERE loan_id = :id"
+    statement: "SELECT id, mobile, email, first_name, last_name, role, status FROM auth.users WHERE is_deleted = false"
+
+  - name: "find_customer"
+    description: "Search for a customer by email, mobile, or name."
+    source: "los-platform"
+    statement: "SELECT id, applicant_full_name, applicant_mobile, applicant_pincode, status FROM loan.loan_applications WHERE applicant_full_name ILIKE :query OR applicant_mobile = :query OR applicant_pan_hash = :query LIMIT 10"
     parameters:
-      - name: "id"
+      - name: "query"
         type: "string"
-        description: "The unique UUID or ID of the loan."
+
+  # Loan Application Core
+  - name: "get_application_details"
+    description: "Fetch comprehensive details of a loan application using its ID."
+    source: "los-platform"
+    statement: "SELECT * FROM loan.loan_applications WHERE id = :application_id"
+    parameters:
+      - name: "application_id"
+        type: "string"
 
   - name: "list_recent_applications"
     description: "List the last 5 loan applications submitted."
     source: "los-platform"
-    statement: "SELECT loan_id, applicant_name, created_at FROM loans ORDER BY created_at DESC LIMIT 5"
+    statement: "SELECT id, application_number, applicant_full_name, status, requested_amount, created_at FROM loan.loan_applications ORDER BY created_at DESC LIMIT 5"
+
+  # Risk & Decision Analysis
+  - name: "get_risk_analysis"
+    description: "Get detailed decision metrics, credit scores, and risk grades for an application."
+    source: "los-platform"
+    statement: "SELECT application_id, status, decision_result, credit_score, credit_grade, risk_score, recommended_amount, rejection_reasons FROM decision.decisions WHERE application_id = :application_id"
+    parameters:
+      - name: "application_id"
+        type: "string"
+
+  - name: "get_rule_results"
+    description: "Fetch detailed pass/fail results from the business rule engine for an application."
+    source: "los-platform"
+    statement: "SELECT rr.rule_code, rr.rule_name, rr.passed, rr.evaluated_value, rr.error_message FROM decision.rule_results rr JOIN decision.decisions d ON rr.decision_id = d.id WHERE d.application_id = :application_id"
+    parameters:
+      - name: "application_id"
+        type: "string"
+
+  # KYC & Identity
+  - name: "get_kyc_summary"
+    description: "Check identity verification status (PAN, Aadhaar) for an application."
+    source: "los-platform"
+    statement: "SELECT kr.id, kr.status, kr.document_type, kr.is_verified, kr.verified_at FROM kyc.kyc_records kr JOIN loan.loan_applications la ON kr.id = la.kyc_id WHERE la.id = :application_id"
+    parameters:
+      - name: "application_id"
+        type: "string"
+
+  # Audit & History
+  - name: "get_application_timeline"
+    description: "View the audit trail and stage history of a loan application."
+    source: "los-platform"
+    statement: "SELECT action, entity_type, changes, timestamp FROM shared.audit_logs WHERE entity_id = :application_id ORDER BY timestamp DESC"
+    parameters:
+      - name: "application_id"
+        type: "string"

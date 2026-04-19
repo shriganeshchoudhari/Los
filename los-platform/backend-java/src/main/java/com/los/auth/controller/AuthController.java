@@ -92,7 +92,7 @@ public class AuthController {
             HttpServletRequest request) {
         log.info("Token refresh request");
 
-        dto.setDeviceFingerprint(request.getHeader("X-Device-Fingerprint"));
+        dto.setDeviceFingerprint(request.getHeader(com.los.common.security.SecurityConstants.HEADER_DEVICE_FINGERPRINT));
 
         ApiResponse<LoginResponseDto> response = authService.refreshToken(dto);
         return ResponseEntity.ok(response);
@@ -105,32 +105,32 @@ public class AuthController {
     @Operation(summary = "Logout", description = "Logout and revoke access token")
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
-            @CookieValue(value = "access_token", required = false) String accessToken,
-            @CookieValue(value = "refresh_token", required = false) String refreshToken) {
+            @CookieValue(value = com.los.common.security.SecurityConstants.COOKIE_ACCESS_TOKEN, required = false) String accessToken,
+            @CookieValue(value = com.los.common.security.SecurityConstants.COOKIE_REFRESH_TOKEN, required = false) String refreshToken) {
         log.info("Logout request received");
 
-        // Try to get the refresh token first, as that's what we primarily revoke
+        // Try to get the refresh token first, as that's what we primarily revoke in the DB
         String tokenToRevoke = refreshToken;
         
         // If no refresh token in cookie, try authorization header or access token cookie
         if (tokenToRevoke == null) {
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                tokenToRevoke = authHeader.substring(7);
+            if (authHeader != null && authHeader.startsWith(com.los.common.security.SecurityConstants.BEARER_PREFIX)) {
+                tokenToRevoke = authHeader.substring(com.los.common.security.SecurityConstants.BEARER_PREFIX.length());
             } else if (accessToken != null) {
                 tokenToRevoke = accessToken;
             }
         }
 
         if (tokenToRevoke == null) {
-            log.warn("Logout attempted without token");
+            log.warn("Logout attempted without any token; returning success as session is already functionally cleared.");
             return ResponseEntity.ok(ApiResponse.success(null, "Already logged out or no session found"));
         }
 
         try {
-            authService.logout(tokenToRevoke, "User logout");
+            // Service handles revocation logic (revoking refresh token vs blacklisting access token)
+            authService.logout(tokenToRevoke, "User logout requested");
         } catch (Exception e) {
-            log.error("Error during token revocation: {}", e.getMessage());
-            // We still return success as the client has already cleared their cookies
+            log.error("Error during backend token revocation: {}. Proceeding with success as client state is cleared.", e.getMessage());
         }
         
         return ResponseEntity.ok(ApiResponse.success(null, "Logout successful"));
@@ -188,10 +188,14 @@ public class AuthController {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String clientIp = request.getHeader("X-Forwarded-For");
-        if (clientIp == null || clientIp.isEmpty() || "unknown".equalsIgnoreCase(clientIp)) {
-            clientIp = request.getRemoteAddr();
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty() && !"unknown".equalsIgnoreCase(xff)) {
+            // Handle multiple proxy layers (comma-separated list: Client, Proxy1, Proxy2)
+            String firstIp = xff.split(",")[0].trim();
+            if (!firstIp.isEmpty() && !"unknown".equalsIgnoreCase(firstIp)) {
+                return firstIp;
+            }
         }
-        return clientIp;
+        return request.getRemoteAddr();
     }
 }

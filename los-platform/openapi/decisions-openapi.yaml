@@ -48,14 +48,12 @@ components:
           type: boolean
         contextData:
           type: string
-        overrideNotes:
-          type: string
     ManualDecisionRequest:
       type: object
       properties:
         applicationId:
           type: string
-        decision:
+        finalDecision:
           type: string
           enum:
             - APPROVE
