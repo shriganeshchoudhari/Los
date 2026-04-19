@@ -78,10 +78,11 @@ __consumer_offsets/
 *.pg_dump
 
 # OpenAPI/specs auto-generated
-generated/
+frontend/.openapi/generated/
 
 
 # Java Build
 backend-java/target/
 .factorypath
 
+frontend/openapi/generated/

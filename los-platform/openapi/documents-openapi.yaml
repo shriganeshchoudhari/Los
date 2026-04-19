@@ -1,0 +1,179 @@
+openapi: 3.0.3
+info:
+  title: Los Platform Documents API
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /documents/presigned-url:
+    post:
+      summary: Get S3 presigned URL for document upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignedUrlRequest'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUrlResponseDto'
+  /documents/{documentId}:
+    get:
+      summary: Get document details
+      parameters:
+        - in: path
+          name: documentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStatusDto'
+  /documents/ocr:
+    post:
+      summary: Run OCR on a document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OcrRequestDto'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcrResponseDto'
+  /documents/{id}/watermark:
+    post:
+      summary: Add watermark to document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WatermarkRequestDto'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStatusDto'
+  /documents/signing-status/{id}:
+    get:
+      summary: Get eSign status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningLog'
+  /documents/application/{applicationId}:
+    get:
+      summary: List documents for an application
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentStatusDto'
+components:
+  schemas:
+    PresignedUrlRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        documentType:
+          type: string
+        mimeType:
+          type: string
+    PresignedUrlResponseDto:
+      type: object
+      properties:
+        uploadUrl:
+          type: string
+        documentId:
+          type: string
+        expiresAt:
+          type: string
+        maxFileSizeBytes:
+          type: integer
+        allowedMimeTypes:
+          type: array
+          items:
+            type: string
+    DocumentStatusDto:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        documentType:
+          type: string
+        status:
+          type: string
+        originalFileName:
+          type: string
+        mimeType:
+          type: string
+        uploadedAt:
+          type: string
+    OcrRequestDto:
+      type: object
+      properties:
+        documentId:
+          type: string
+        ocrConfig?:
+          type: object
+    OcrResponseDto:
+      type: object
+      properties:
+        text?: string
+        extractedFields?: object
+        processedAt?: string
+    WatermarkRequestDto:
+      type: object
+      properties:
+        documentId:
+          type: string
+        watermarkText:
+          type: string
+    SigningLog:
+      type: object
+      properties:
+        id:
+          type: string
+        documentId:
+          type: string
+        status:
+          type: string
+        signedAt:
+          type: string

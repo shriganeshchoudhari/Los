@@ -1,6 +1,5 @@
 package com.los.loan.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,7 +10,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class UpdateApplicationDto {
 
-    @NotBlank(message = "Application ID is required")
+    // Set from path variable by the controller — not required in JSON body
     private String applicationId;
 
     private String loanType;

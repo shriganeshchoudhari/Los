@@ -136,7 +136,7 @@ los:
       asa-code: ${UIDAI_ASA_CODE:}
       public-key: ${UIDAI_PUBLIC_KEY:}
     nsdl:
-      base-url: ${NSDL_BASE_URL:https://panuti的服务/api}
+      base-url: ${NSDL_BASE_URL:https://api.sandbox.nsdl.com/pan}
       api-key: ${NSDL_API_KEY:}
     face-match:
       url: ${FACE_MATCH_URL:https://faceverify.example.com}

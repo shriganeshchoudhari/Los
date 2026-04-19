@@ -45,14 +45,16 @@ export default function DashboardPage() {
       if (activeTab === 'PENDING_APPROVAL') params.status = 'CREDIT_ASSESSMENT';
       if (activeTab === 'SANCTIONED') params.status = 'SANCTIONED';
       if (search) params.search = search;
-      const { data: res } = await loanApi.list(params);
+      const { data: res } = await loanApi.list(params as Parameters<typeof loanApi.list>[0]);
+      // Spring ApiResponse<Page<T>>: { success, data: { content: [], totalElements, ... }, message }
       return res;
     },
     refetchInterval: 30_000,
   });
 
-  const applications = data?.applications || [];
-  const total = data?.total || 0;
+  // Spring Page wraps in ApiResponse: res = { success, data: Page, message }
+  const applications = (data as any)?.data?.content || [];
+  const total = (data as any)?.data?.totalElements || 0;
 
   const stats = {
     total,
@@ -80,11 +82,11 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium">{profile?.fullName ?? 'Loading...'}</p>
+                <p className="text-sm font-medium">{profile?.name ?? 'Loading...'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.role ? profile.role.replace(/_/g, ' ') : '—'}</p>
               </div>
               <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">
-                {profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '??'}
+                {profile?.name ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '??'}
               </div>
               <Button variant="ghost" size="sm" onClick={logout}>Logout</Button>
             </div>

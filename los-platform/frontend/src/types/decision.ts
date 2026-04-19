@@ -12,7 +12,8 @@ export type DecisionStatus =
   | 'CONDITIONALLY_APPROVED'
   | 'REJECTED'
   | 'REFER_TO_CREDIT_COMMITTEE'
-  | 'MANUAL_OVERRIDE';
+  | 'MANUAL_OVERRIDE'
+  | 'OVERRIDE_PENDING';
 
 export type BenchmarkRateType = 'MCLR_1Y' | 'MCLR_3M' | 'REPO_RATE' | 'T_BILL_91D';
 
@@ -103,6 +104,8 @@ export interface TriggerDecisionRequest {
   applicationId: UUID;
   forceRerun?: boolean;
   overrideNotes?: string;
+  // Canonical field name per OpenAPI contract
+  contextData?: string;
 }
 
 export interface ManualDecisionRequest {
@@ -114,4 +117,26 @@ export interface ManualDecisionRequest {
   conditions?: Omit<ApprovalCondition, 'satisfiedAt' | 'satisfiedBy'>[];
   rejectionReasonCode?: RejectionReasonCode;
   remarks: string;
+}
+
+// Responses (DTOs) - added to align frontend typing with backend responses
+export interface DecisionResponseDto {
+  applicationId: UUID;
+  status: DecisionStatus;
+  finalDecision: 'APPROVE' | 'REJECT' | 'MANUAL';
+  approvedAmount?: PaisaAmount;
+  approvedTenureMonths?: number;
+  rejectionReasonCode?: RejectionReasonCode;
+  remarks?: string;
+  decidedAt?: ISODateTimeString;
+}
+
+export interface DecisionHistoryDto {
+  id: UUID;
+  applicationId: UUID;
+  fromStatus: DecisionStatus;
+  toStatus: DecisionStatus;
+  changedAt: ISODateTimeString;
+  changedBy?: string;
+  remarks?: string;
 }

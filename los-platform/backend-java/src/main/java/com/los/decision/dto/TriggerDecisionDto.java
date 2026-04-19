@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 @Data
 @NoArgsConstructor
@@ -17,5 +18,7 @@ public class TriggerDecisionDto {
     @NotNull(message = "Force rerun flag is required")
     private Boolean forceRerun = false;
 
+    // Accepts alternate field name from frontend: overrideNotes -> contextData
+    @JsonAlias({"overrideNotes"})
     private String contextData;
 }

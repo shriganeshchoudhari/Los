@@ -3,6 +3,7 @@ package com.los.loan.service;
 import com.los.loan.dto.CreateLoanApplicationDto;
 import com.los.loan.dto.UpdateApplicationDto;
 import com.los.loan.dto.ApplicationResponseDto;
+import com.los.loan.dto.ManagerDecisionDto;
 import com.los.loan.entity.LoanApplication;
 import com.los.loan.repository.LoanApplicationRepository;
 import com.los.common.dto.ApiResponse;
@@ -114,6 +115,51 @@ public class LoanApplicationService {
         loanApplicationRepository.save(application);
 
         return ApiResponse.success(null, "Application submitted successfully");
+    }
+
+    public ApiResponse<ApplicationResponseDto> submitManagerDecision(ManagerDecisionDto dto) {
+        log.info("Manager decision for application: {} action: {}", dto.getApplicationId(), dto.resolvedAction());
+
+        LoanApplication application = loanApplicationRepository.findById(dto.getApplicationId())
+            .orElseThrow(() -> new LosException("LOAN_001", "Application not found", 404, false));
+
+        String action = dto.resolvedAction();
+        if (action == null) {
+            throw new LosException("LOAN_010", "Decision action is required", 400, false);
+        }
+
+        switch (action) {
+            case "APPROVED", "CONDITIONALLY_APPROVED", "APPROVE" -> {
+                if (dto.getSanctionedAmount() != null) {
+                    application.setRequestedAmount(dto.getSanctionedAmount());
+                } else if (dto.getApprovalAmount() != null) {
+                    application.setRequestedAmount(dto.getApprovalAmount());
+                }
+                if (dto.getTenureMonths() != null) {
+                    application.setTenureMonths(dto.getTenureMonths());
+                } else if (dto.getApprovalTenureMonths() != null) {
+                    application.setTenureMonths(dto.getApprovalTenureMonths());
+                }
+                application.setStatus("SANCTIONED");
+            }
+            case "REJECTED", "REJECT" -> {
+                if (dto.getRemarks() == null || dto.getRemarks().isBlank()) {
+                    throw new LosException("LOAN_011", "Rejection remarks are required", 400, false);
+                }
+                application.setStatus("REJECTED");
+            }
+            default -> application.setStatus("PENDING_REVIEW");
+        }
+
+        application.setApprovedAt(java.time.LocalDateTime.now());
+        LoanApplication saved = loanApplicationRepository.save(application);
+
+        ApplicationResponseDto response = new ApplicationResponseDto();
+        response.setApplicationId(saved.getId());
+        response.setApplicationNumber(saved.getApplicationNumber());
+        response.setStatus(saved.getStatus());
+        response.setMessage("Decision recorded: " + action);
+        return ApiResponse.success(response, "Manager decision applied successfully");
     }
 
     public ApiResponse<org.springframework.data.domain.Page<ApplicationResponseDto>> getAllApplications(org.springframework.data.domain.Pageable pageable) {

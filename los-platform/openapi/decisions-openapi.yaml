@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: Los Platform Decisions API
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /decisions/trigger:
+    post:
+      summary: Trigger decision for an application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerDecisionRequest'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDecision'
+  /decisions/override:
+    post:
+      summary: Override decision for an application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualDecisionRequest'
+      responses:
+        '200':
+          description: success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseDecision'
+components:
+  schemas:
+    TriggerDecisionRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        forceRerun:
+          type: boolean
+        contextData:
+          type: string
+        overrideNotes:
+          type: string
+    ManualDecisionRequest:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        decision:
+          type: string
+          enum:
+            - APPROVE
+            - REJECT
+        approvedAmount:
+          type: number
+        approvedTenureMonths:
+          type: integer
+        rateOfInterestBps:
+          type: number
+        conditions:
+          type: array
+          items:
+            type: object
+        rejectionReasonCode:
+          type: string
+        remarks:
+          type: string
+    ApiResponseDecision:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+    DecisionResponseDto:
+      type: object
+      properties:
+        applicationId:
+          type: string
+        status:
+          type: string
+        finalDecision:
+          type: string
+        approvedAmount:
+          type: number
+        approvedTenureMonths:
+          type: integer
+        rejectionReasonCode:
+          type: string
+        remarks:
+          type: string
+        decidedAt:
+          type: string
+    DecisionHistoryDto:
+      type: object
+      properties:
+        id:
+          type: string
+        applicationId:
+          type: string
+        fromStatus:
+          type: string
+        toStatus:
+          type: string
+        changedAt:
+          type: string
+        changedBy:
+          type: string
+        remarks:
+          type: string

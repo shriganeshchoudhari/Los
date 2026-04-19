@@ -1,23 +1,22 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 
 const AUTH_SERVICE_URL =
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:8082/api';
 const KYC_SERVICE_URL =
-  process.env.NEXT_PUBLIC_KYC_SERVICE_URL || 'http://localhost:3002';
+  process.env.NEXT_PUBLIC_KYC_SERVICE_URL || 'http://localhost:8082/api';
 const LOAN_SERVICE_URL =
-  process.env.NEXT_PUBLIC_LOAN_SERVICE_URL || 'http://localhost:3003';
+  process.env.NEXT_PUBLIC_LOAN_SERVICE_URL || 'http://localhost:8082/api';
 const DOCUMENT_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DOCUMENT_SERVICE_URL || 'http://localhost:3009';
+  process.env.NEXT_PUBLIC_DOCUMENT_SERVICE_URL || 'http://localhost:8082/api';
 const DECISION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DECISION_SERVICE_URL || 'http://localhost:3004';
+  process.env.NEXT_PUBLIC_DECISION_SERVICE_URL || 'http://localhost:8082/api';
 const INTEGRATION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_INTEGRATION_SERVICE_URL || 'http://localhost:3006';
+  process.env.NEXT_PUBLIC_INTEGRATION_SERVICE_URL || 'http://localhost:8082/api';
 const NOTIFICATION_SERVICE_URL =
-  process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL || 'http://localhost:3007';
+  process.env.NEXT_PUBLIC_NOTIFICATION_SERVICE_URL || 'http://localhost:8082/api';
 const DSA_SERVICE_URL =
-  process.env.NEXT_PUBLIC_DSA_SERVICE_URL || 'http://localhost:3008';
+  process.env.NEXT_PUBLIC_DSA_SERVICE_URL || 'http://localhost:8082/api';
 const GATEWAY_URL =
   process.env.NEXT_PUBLIC_API_GATEWAY_URL || '';
 
@@ -25,14 +24,6 @@ function addCorrelationId(config: InternalAxiosRequestConfig): InternalAxiosRequ
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
   config.headers['X-Request-Id'] = requestId;
   config.headers['X-Correlation-Id'] = requestId;
-  return config;
-}
-
-function addAuthToken(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
-  const token = Cookies.get('access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
   return config;
 }
 
@@ -60,7 +51,6 @@ function createServiceApi(baseURL: string, requiresAuth = true): AxiosInstance {
 
   instance.interceptors.request.use((config) => {
     config = addCorrelationId(config);
-    if (requiresAuth) config = addAuthToken(config);
     return config;
   });
 
@@ -71,23 +61,20 @@ function createServiceApi(baseURL: string, requiresAuth = true): AxiosInstance {
 
       if (error.response?.status === 401 && !originalRequest._retry && requiresAuth) {
         originalRequest._retry = true;
-        const refreshToken = Cookies.get('refresh_token');
-        if (refreshToken) {
-          try {
-            const authApiInstance = axios.create({ baseURL: AUTH_SERVICE_URL, timeout: 10_000 });
-            const { data } = await authApiInstance.post('/auth/refresh', { refreshToken });
-            Cookies.set('access_token', data.accessToken, { expires: 1 / 96 });
-            if (data.refreshToken) Cookies.set('refresh_token', data.refreshToken, { expires: 7 });
-            originalRequest.headers!.Authorization = `Bearer ${data.accessToken}`;
+        try {
+          // Call the Next.js proxy route that reads the httpOnly refresh_token cookie
+          const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+          if (refreshRes.ok) {
+            // Cookies are updated by the server route automatically
+            // Just retry the original request — the browser sends the new httpOnly access_token cookie
             return instance(originalRequest);
-          } catch {
-            Cookies.remove('access_token');
-            Cookies.remove('refresh_token');
-            window.location.href = '/login';
           }
-        } else {
-          window.location.href = '/login';
+        } catch {
+          // network error during refresh
         }
+        // Refresh failed — redirect to login
+        if (typeof window !== 'undefined') window.location.href = '/login';
+        return Promise.reject(error);
       }
       return handleError(error);
     },
@@ -110,7 +97,7 @@ export const authApi = {
     authSvc.post('/auth/otp/send', { mobile, purpose, channel }),
   verifyOtp: (sessionId: string, mobile: string, otp: string) =>
     authSvc.post('/auth/otp/verify', { sessionId, mobile, otp }),
-  refresh: (refreshToken: string) => authSvc.post('/auth/refresh', { refreshToken }),
+  refresh: (refreshToken: string) => authSvc.post('/auth/token/refresh', { refreshToken }),
   logout: () => authSvc.post('/auth/logout'),
   getProfile: () => authSvc.get('/auth/profile'),
 };
@@ -159,7 +146,7 @@ export const documentApi = {
       timeout: 60_000,
     });
   },
-  list: (applicationId: string) => docSvc.get(`/documents/${applicationId}`),
+  list: (applicationId: string) => docSvc.get(`/documents/application/${applicationId}`),
   getOcrResult: (documentId: string) => docSvc.get(`/documents/${documentId}/ocr`),
   approve: (documentId: string, remarks?: string) =>
     docSvc.post(`/documents/${documentId}/approve`, { remarks }),
@@ -171,7 +158,7 @@ export const bureauApi = {
   pull: (applicationId: string, consentOtp: string) =>
     integrationSvc.post('/integration/bureau/pull', { applicationId, consentOtp }),
   getReports: (applicationId: string) =>
-    integrationSvc.get(`/integration/bureau/reports`, { params: { applicationId } }),
+    integrationSvc.get(`/integration/bureau/${applicationId}`),
 };
 
 export const decisionApi = {
@@ -179,18 +166,18 @@ export const decisionApi = {
     decisionSvc.post(`/decisions/trigger`, { applicationId }),
   get: (applicationId: string) => decisionSvc.get(`/decisions/${applicationId}`),
   override: (applicationId: string, decision: string, reason: string) =>
-    decisionSvc.post(`/decisions/${applicationId}/override`, { decision, reason }),
+    decisionSvc.post('/decisions/override', { applicationId, decision, reason }),
 };
 
 export const disbursementApi = {
   initiate: (applicationId: string, amount: number, accountNumber: string, ifsc: string) =>
-    integrationSvc.post('/integration/disbursement', {
+    integrationSvc.post('/integration/disburse', {
       applicationId, amount, beneficiaryAccountNumber: accountNumber, beneficiaryIfsc: ifsc,
     }),
-  getStatus: (disbursementId: string) =>
-    integrationSvc.get(`/integration/disbursement/${disbursementId}`),
-  list: (applicationId?: string) =>
-    integrationSvc.get('/integration/disbursement', { params: { applicationId } }),
+  getStatus: (loanId: string) =>
+    integrationSvc.get(`/integration/disburse/${loanId}`),
+  list: (loanId: string) =>
+    integrationSvc.get(`/integration/disburse/${loanId}`),
 };
 
 export const sanctionLetterApi = {
@@ -227,8 +214,8 @@ export const auditApi = {
 export const notificationApi = {
   send: (channel: string, recipientId: string, templateName: string, variables: Record<string, unknown>, applicationId?: string) =>
     notificationSvc.post('/notifications/send', { channel, recipientId, templateName, variables, applicationId }),
-  history: (params?: { applicationId?: string; page?: number; limit?: number }) =>
-    notificationSvc.get('/notifications/history', { params }),
+  history: (recipientId: string, params?: { page?: number; limit?: number }) =>
+    notificationSvc.get(`/notifications/history/${recipientId}`, { params }),
 };
 
 export const dsaApi = {

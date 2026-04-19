@@ -20,8 +20,8 @@ spring:
 
 los:
   jwt:
-    public-key-file: ../backend/keys/jwt-public.pem
-    private-key-file: ../backend/keys/jwt-private.pem
+    public-key-path: keys/public_key.pem
+    private-key-path: keys/private_key.pem
   seed:
     enabled: true
 
@@ -51,5 +51,5 @@ resilience4j:
 
 logging:
   level:
-    com.los: DEBUG
-    org.springframework.security: DEBUG
+    "[com.los]": DEBUG
+    "[org.springframework.security]": DEBUG

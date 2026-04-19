@@ -15,6 +15,12 @@ public class LosProperties {
     private Redis redis = new Redis();
     private Minio minio = new Minio();
     private Kyc kyc = new Kyc();
+    private Seed seed = new Seed();
+
+    @Data
+    public static class Seed {
+        private boolean enabled;
+    }
 
     @Data
     public static class Jwt {

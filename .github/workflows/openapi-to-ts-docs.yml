@@ -1,0 +1,44 @@
+name: OpenAPI to TypeScript (Documents)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  generate-and-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend deps
+        working-directory: ./frontend
+        run: |
+          npm ci
+
+      - name: Generate OpenAPI TS types for Documents
+        working-directory: ./frontend
+        run: |
+          npx openapi-typescript ../openapi/documents-openapi.yaml --output openapi/generated/documents.d.ts
+
+      - name: Drift Check (compare with committed)
+        working-directory: ./frontend
+        run: |
+          if ! git diff --exit-code openapi/generated/documents.d.ts; then
+            echo 'Documents OpenAPI TS types drift detected. Please regenerate to align with the contract.';
+            exit 1;
+          fi
+
+      - name: Archive generated types
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documents-openapi-types
+          path: frontend/openapi/generated/documents.d.ts

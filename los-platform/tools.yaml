@@ -1,0 +1,21 @@
+# Google MCP Toolbox - Corrected Schema
+sources:
+  - name: "los-platform"
+    type: "postgres"
+    parameters:
+      connection_string: "postgresql://postgres:postgres@localhost:5432/los_platform"
+
+tools:
+  - name: "get_loan_status"
+    description: "Check the status of a loan application by ID."
+    source: "los-platform"
+    statement: "SELECT status, applicant_name, amount FROM loans WHERE loan_id = :id"
+    parameters:
+      - name: "id"
+        type: "string"
+        description: "The unique UUID or ID of the loan."
+
+  - name: "list_recent_applications"
+    description: "List the last 5 loan applications submitted."
+    source: "los-platform"
+    statement: "SELECT loan_id, applicant_name, created_at FROM loans ORDER BY created_at DESC LIMIT 5"
