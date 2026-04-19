@@ -104,12 +104,36 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Logout", description = "Logout and revoke access token")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @RequestHeader("Authorization") String authHeader) {
-        log.info("Logout request");
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @CookieValue(value = "access_token", required = false) String accessToken,
+            @CookieValue(value = "refresh_token", required = false) String refreshToken) {
+        log.info("Logout request received");
 
-        String token = authHeader.replace("Bearer ", "");
-        ApiResponse<Void> response = authService.logout(token, "User logout");
-        return ResponseEntity.ok(response);
+        // Try to get the refresh token first, as that's what we primarily revoke
+        String tokenToRevoke = refreshToken;
+        
+        // If no refresh token in cookie, try authorization header or access token cookie
+        if (tokenToRevoke == null) {
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                tokenToRevoke = authHeader.substring(7);
+            } else if (accessToken != null) {
+                tokenToRevoke = accessToken;
+            }
+        }
+
+        if (tokenToRevoke == null) {
+            log.warn("Logout attempted without token");
+            return ResponseEntity.ok(ApiResponse.success(null, "Already logged out or no session found"));
+        }
+
+        try {
+            authService.logout(tokenToRevoke, "User logout");
+        } catch (Exception e) {
+            log.error("Error during token revocation: {}", e.getMessage());
+            // We still return success as the client has already cleared their cookies
+        }
+        
+        return ResponseEntity.ok(ApiResponse.success(null, "Logout successful"));
     }
 
     /**

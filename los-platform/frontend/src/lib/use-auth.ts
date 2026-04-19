@@ -71,20 +71,29 @@ export function useAuth() {
   const pathname = usePathname();
 
   const loadUserFromToken = useCallback((): AuthUser | null => {
-    const token = Cookies.get('access_token');
-    if (!token || isTokenExpired(token)) return null;
-    const decoded = decodeJWT(token);
-    if (!decoded) return null;
-    return {
-      id: decoded.sub,
-      employeeId: decoded.employeeId,
-      fullName: decoded.fullName,
-      email: decoded.email,
-      mobile: decoded.mobile ?? '',
-      role: decoded.role,
-      branchCode: decoded.branchCode,
-      permissions: decoded.permissions ?? [],
-    };
+    const userInfoStr = Cookies.get('user_info');
+    if (!userInfoStr) return null;
+    
+    try {
+      const userInfo = JSON.parse(userInfoStr);
+      // Check if expired
+      if (userInfo.exp && userInfo.exp * 1000 < Date.now()) {
+        return null;
+      }
+      
+      return {
+        id: userInfo.id,
+        employeeId: userInfo.employeeId,
+        fullName: userInfo.fullName,
+        email: userInfo.email,
+        mobile: userInfo.mobile ?? '',
+        role: userInfo.role,
+        branchCode: userInfo.branchCode,
+        permissions: userInfo.permissions ?? [],
+      };
+    } catch {
+      return null;
+    }
   }, []);
 
   const refreshAuth = useCallback(() => {
@@ -98,19 +107,8 @@ export function useAuth() {
     refreshAuth();
   }, [refreshAuth]);
 
-  useEffect(() => {
-    const token = Cookies.get('access_token');
-    if (!token || isTokenExpired(token)) {
-      if (PROTECTED_ROUTES.some((r) => pathname?.startsWith(r))) {
-        router.push('/login');
-        return;
-      }
-      if (DSA_ROUTES.some((r) => pathname?.startsWith(r))) {
-        router.push('/dsa/login');
-        return;
-      }
-    }
-  }, [pathname, router]);
+  // Client-side redirects are removed because middleware.ts handles it securely on the server side
+  // This prevents redirect loops when HttpOnly cookies are used.
 
   const login = useCallback((accessToken: string, refreshToken: string, expiresInSeconds = 900) => {
     const expHours = expiresInSeconds / 3600;
