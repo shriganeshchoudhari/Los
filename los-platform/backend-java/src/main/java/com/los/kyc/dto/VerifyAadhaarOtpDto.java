@@ -23,8 +23,8 @@ public class VerifyAadhaarOtpDto {
     @Schema(description = "Transaction ID from initiate response")
     private String txnId;
 
-    @NotBlank(message = "UIDAI reference ID is required")
-    @Schema(description = "UIDAI reference ID from initiate response")
+    // UIDAI reference ID is optional for now – frontend does not provide it
+    @Schema(description = "UIDAI reference ID from initiate response", nullable = true)
     private String uidaiRefId;
 
     @NotBlank(message = "OTP is required")

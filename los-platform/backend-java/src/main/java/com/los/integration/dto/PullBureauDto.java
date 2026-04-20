@@ -14,7 +14,7 @@ public class PullBureauDto {
     @NotBlank(message = "Application ID is required")
     private String applicationId;
 
-    @NotBlank(message = "Applicant ID is required")
+    // Applicant ID, PAN and Provider are optional for the current UI flow
     private String applicantId;
 
     @NotBlank(message = "PAN is required")

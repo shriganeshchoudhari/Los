@@ -21,4 +21,8 @@ public class InitiateAadhaarKycDto {
     @NotBlank(message = "Consent OTP session ID is required")
     @Schema(description = "OTP session ID for consent confirmation", example = "session-12345")
     private String consentOtpSessionId;
+
+    @NotBlank(message = "Aadhaar number is required")
+    @Schema(description = "Aadhaar number for KYC", example = "123456789012")
+    private String aadhaarNumber;
 }
