@@ -31,4 +31,7 @@ public class VerifyAadhaarOtpDto {
     @Pattern(regexp = "^\\d{6}$", message = "OTP must be a 6-digit number")
     @Schema(description = "6-digit OTP from UIDAI", example = "123456")
     private String otp;
+
+    @Schema(description = "Aadhaar Number (used for hashing)", example = "1234-5678-9012")
+    private String aadhaarNumber;
 }

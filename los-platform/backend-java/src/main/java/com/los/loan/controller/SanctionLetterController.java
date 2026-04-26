@@ -20,16 +20,19 @@ public class SanctionLetterController {
     private final SanctionLetterService service;
 
     @GetMapping("/{id}/preview")
-    public ResponseEntity<ApiResponse<byte[]>> preview(@PathVariable String id) {
+    public ResponseEntity<byte[]> preview(@PathVariable String id) {
         byte[] pdf = service.generatePreview(id);
-        return ResponseEntity.ok(new ApiResponse<>(pdf));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, "application/pdf")
+                .body(pdf);
     }
 
     @GetMapping("/{id}/pdf")
-    public ResponseEntity<ApiResponse<byte[]>> download(@PathVariable String id) {
+    public ResponseEntity<byte[]> download(@PathVariable String id) {
         byte[] pdf = service.generatePdf(id);
         return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, "application/pdf")
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"sanction-letter.pdf\"")
-                .body(new ApiResponse<>(pdf));
+                .body(pdf);
     }
 }

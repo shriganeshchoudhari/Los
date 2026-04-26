@@ -103,8 +103,9 @@ public class AuthService {
         dto.setMobile(user.getMobile());
         dto.setEmail(user.getEmail());
         dto.setRole(user.getRole().name());
-        // permissions can be added here if needed
         dto.setLoginTime(user.getLastLoginAt());
+        dto.setBranchName(user.getBranchName());
+        dto.setBranchCode(user.getBranchCode());
         
         return ApiResponse.success(dto, "Profile retrieved successfully");
     }

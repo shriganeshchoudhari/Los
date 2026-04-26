@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { OTPDigitInput, StatusBadge } from '@/components/ui/components';
 import { kycApi } from '@/lib/api';
 import { maskAadhaar, maskPAN } from '@/lib/utils';

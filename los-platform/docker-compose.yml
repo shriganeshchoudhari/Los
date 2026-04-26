@@ -1,0 +1,195 @@
+version: '3.8'
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LOS Platform — Unified Docker Compose (Spring Boot Monolith)
+# Backend: Spring Boot (Java 21) at port 8082
+# Frontend: Next.js at port 3000
+# Mock Server: WireMock at port 8080 (Mocks all external bank/KYC APIs)
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: los-postgres
+    environment:
+      POSTGRES_DB: los_platform
+      POSTGRES_USER: los_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-los_password}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U los_user -d los_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - los-network
+
+  # ── Redis (Caching & Sessions) ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: los-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - los-network
+
+  # ── Zookeeper & Kafka (Event Bus) ───────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: los-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - los-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: los-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - los-network
+
+  # ── MinIO (Object Storage for Documents) ─────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: los-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - los-network
+
+  # ── WireMock (Mock Server for External Integrations) ─────────────────────────
+  mock-server:
+    image: wiremock/wiremock:3.5.2
+    container_name: los-mock-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./devops/mock-server/mappings:/home/wiremock/mappings:ro
+    command: ["--port=8080", "--global-response-templating", "--verbose"]
+    networks:
+      - los-network
+
+  # ── Java Backend (Spring Boot Monolith) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend-java
+      dockerfile: Dockerfile
+    container_name: los-backend
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./backend-java/keys:/app/keys:ro
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/los_platform?stringtype=unspecified
+      SPRING_DATASOURCE_USERNAME: los_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-los_password}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: los-documents
+      # JWT Keys
+      JWT_PRIVATE_KEY_PATH: /app/keys/private_key.pem
+      JWT_PUBLIC_KEY_PATH: /app/keys/public_key.pem
+      # External API Redirects to Mock Server
+      UIDAI_BASE_URL: http://mock-server:8080
+      NSDL_BASE_URL: http://mock-server:8080
+      FACE_MATCH_URL: http://mock-server:8080/facematch/verify
+      CIBIL_URL: http://mock-server:8080/bureau/cibil/report
+      EXPERIAN_URL: http://mock-server:8080/bureau/experian/report
+      EQUIFAX_URL: http://mock-server:8080/bureau/equifax/report
+      CRIF_URL: http://mock-server:8080/bureau/crif/report
+      NPCI_BASE_URL: http://mock-server:8080
+      CBS_BASE_URL: http://mock-server:8080
+      OCR_BASE_URL: http://mock-server:8080
+      SMS_URL: http://mock-server:8080/sms/send
+      WHATSAPP_URL: http://mock-server:8080/whatsapp/send
+      FRONTEND_ORIGIN: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - los-network
+
+  # ── Frontend (Next.js) ───────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../devops/docker/Dockerfile.frontend
+    container_name: los-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_AUTH_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_KYC_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_LOAN_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_DOCUMENT_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_DECISION_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_INTEGRATION_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_NOTIFICATION_SERVICE_URL: http://localhost:8082/api
+      NEXT_PUBLIC_DSA_SERVICE_URL: http://localhost:8082/api
+    depends_on:
+      - backend
+    networks:
+      - los-network
+
+  # ── MailHog (SMTP Mock for Emails) ───────────────────────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: los-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - los-network
+
+networks:
+  los-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

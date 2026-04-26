@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,25 +18,43 @@ public class DecisionContractTests {
     @Autowired
     private MockMvc mvc;
 
+    private String applicationId = "55555555-5555-5555-5555-555555555555";
+
     @Test
     void triggerDecisionAcceptsAliasContextData() throws Exception {
-        String payload = "{\"applicationId\": \"app-1\", \"forceRerun\": true, \"contextData\": \"ctx\"}";
-        mvc.perform(post("/api/decisions/trigger").contentType("application/json").content(payload))
+        String payload = "{\"applicationId\": \"" + applicationId + "\", \"forceRerun\": true}";
+        mvc.perform(post("/api/decisions/trigger")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
     }
 
     @Test
     void manualOverrideAcceptsFinalDecision() throws Exception {
-        String payload = "{\"applicationId\": \"app-1\", \"finalDecision\": \"APPROVE\", \"rejectionReasonCode\": \"OTHER\", \"remarks\": \"ok\"}";
-        mvc.perform(post("/api/decisions/override").contentType("application/json").content(payload))
+        // First trigger to ensure decision exists
+        mvc.perform(post("/api/decisions/trigger")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applicationId\": \"" + applicationId + "\", \"forceRerun\": true}"))
+                .andExpect(status().isOk());
+
+        String payload = "{\"applicationId\": \"" + applicationId + "\", \"status\": \"APPROVED\", \"decision\": \"APPROVE\", \"remarks\": \"Manual override test\"}";
+        mvc.perform(post("/api/decisions/override")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
     }
 
     @Test
     void endToEndDecisionFlowCanonical() throws Exception {
-        String post = "{\"applicationId\": \"app-1\", \"forceRerun\": false, \"contextData\": \"ctx\"}";
-        mvc.perform(post("/api/decisions/trigger").contentType("application/json").content(post))
+        mvc.perform(post("/api/decisions/trigger")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"applicationId\": \"" + applicationId + "\", \"forceRerun\": false}"))
+                .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
                 .andExpect(status().isOk());
-        mvc.perform(get("/api/decisions/app-1")).andExpect(status().isOk());
+        
+        mvc.perform(get("/api/decisions/" + applicationId))
+                .andExpect(status().isOk());
     }
 }

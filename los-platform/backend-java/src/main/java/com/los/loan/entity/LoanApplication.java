@@ -39,8 +39,9 @@ public class LoanApplication extends BaseEntity {
     @Column(name = "tenure_months")
     private Integer tenureMonths;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "DRAFT"; // DRAFT, submitted, APPROVED, DISBURSED, CLOSED, REJECTED
+    private LoanStatus status = LoanStatus.DRAFT;
 
     @Column(name = "application_date", nullable = false)
     private LocalDate applicationDate;

@@ -1,19 +1,17 @@
-# Multi-stage Maven build for LOS Platform Spring Boot
-FROM eclipse-temurin:21-jdk-alpine AS builder
+# Multi-stage build for LOS Platform Spring Boot Monolith
+# Stage 1: Build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
 
-# Copy pom.xml and download dependencies first (layer caching)
+# Copy pom.xml and source code
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code
 COPY src ./src
 
-# Build the application
+# Build the application - skip tests for docker build
 RUN mvn clean package -DskipTests -B
 
-# Runtime stage
+# Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
@@ -24,17 +22,16 @@ RUN addgroup -S los && adduser -S los -G los
 # Copy the JAR from builder
 COPY --from=builder /app/target/*.jar app.jar
 
-# Copy JWT keys (mounted from host)
-COPY --from=builder /app/../backend/keys /keys
-
-# Set ownership
-RUN chown -R los:los /app /keys
-
-USER los
-
-EXPOSE 8080
+# Expose backend port
+EXPOSE 8082
 
 # JVM tuning for containers
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
 
+# Set ownership
+RUN chown -R los:los /app
+
+USER los
+
+# Entrypoint runs the JAR
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

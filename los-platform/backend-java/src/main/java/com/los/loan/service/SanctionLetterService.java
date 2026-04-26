@@ -5,6 +5,7 @@ import com.los.loan.entity.LoanApplication;
 import com.los.loan.entity.LoanAgreement;
 import com.los.loan.repository.LoanApplicationRepository;
 import com.los.loan.repository.LoanAgreementRepository;
+import com.los.loan.entity.LoanStatus;
 import com.los.common.dto.ApiResponse;
 import com.los.common.exception.LosException;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,7 @@ public class SanctionLetterService {
         loanAgreementRepository.save(agreement);
 
         // Update application
-        application.setStatus("SANCTION_LETTER_GENERATED");
+        application.setStatus(LoanStatus.SANCTIONED);
         application.setSanctionAmount(dto.getSanctionAmount());
         application.setTenureMonths(dto.getTenureMonths());
         loanApplicationRepository.save(application);
@@ -53,5 +54,15 @@ public class SanctionLetterService {
             "interestRate", dto.getInterestRateBps() / 100.0,
             "tenureMonths", dto.getTenureMonths()
         ));
+    }
+
+    public byte[] generatePreview(String id) {
+        log.info("Generating sanction letter preview: {}", id);
+        return "MOCK_PDF_PREVIEW_CONTENT".getBytes();
+    }
+
+    public byte[] generatePdf(String id) {
+        log.info("Generating sanction letter PDF: {}", id);
+        return "MOCK_PDF_CONTENT".getBytes();
     }
 }

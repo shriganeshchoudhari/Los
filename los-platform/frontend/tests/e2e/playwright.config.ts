@@ -1,4 +1,4 @@
-# Playwright Configuration for LOS Platform
+// Playwright Configuration for LOS Platform
 
 import { defineConfig, devices } from '@playwright/test';
 

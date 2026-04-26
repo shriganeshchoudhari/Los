@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/components';
 import { formatCurrency, formatDateTime, calculateEMI } from '@/lib/utils';
 import { loanApi, bureauApi } from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BranchManagerPage() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
@@ -124,7 +125,13 @@ export default function BranchManagerPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Loading applications...</div>
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h3 className="font-semibold">Applications Awaiting Sanction</h3>
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full" />)}
+            </div>
+            <Skeleton className="h-[500px] w-full lg:sticky lg:top-24" />
+          </div>
         ) : applications.length === 0 ? (
           <Card><CardContent className="py-12 text-center text-muted-foreground">No applications pending branch manager review.</CardContent></Card>
         ) : (
@@ -203,7 +210,7 @@ export default function BranchManagerPage() {
                   </div>
 
                   {loadingBureau ? (
-                    <p className="text-xs text-muted-foreground text-center py-2">Loading bureau data...</p>
+                    <Skeleton className="h-16 w-full" />
                   ) : bureauData?.length > 0 && (
                     <div className="border rounded-lg p-3 text-xs">
                       <p className="font-semibold text-muted-foreground mb-2">Bureau Summary</p>

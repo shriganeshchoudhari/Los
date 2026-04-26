@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/los_platform
-    username: los_user
-    password: los_password
+    url: jdbc:postgresql://localhost:5432/los_platform?stringtype=unspecified
+    username: postgres
+    password: postgres
 
   flyway:
     schemas: auth,kyc,loan,decision,integration,notification,dsa,document,shared,public
@@ -18,12 +18,50 @@ spring:
     urls: ldap://localhost:389
     base: dc=bank,dc=internal
 
+  mail:
+    host: localhost
+    port: 1025
+    username: noreply@losplatform.com
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+management:
+  health:
+    mail:
+      enabled: false
+
 los:
   jwt:
     public-key-path: keys/public_key.pem
     private-key-path: keys/private_key.pem
   seed:
     enabled: true
+  kyc:
+    uidai:
+      base-url: http://localhost:8080
+    nsdl:
+      base-url: http://localhost:8080
+    face-match:
+      url: http://localhost:8080/facematch/verify
+  integration:
+    cibil-url: http://localhost:8080/bureau/cibil/report
+    experian-url: http://localhost:8080/bureau/experian/report
+    equifax-url: http://localhost:8080/bureau/equifax/report
+    crif-url: http://localhost:8080/bureau/crif/report
+    npci-url: http://localhost:8080
+    cbs-url: http://localhost:8080
+    ocr-url: http://localhost:8080
+  notification:
+    sms-url: http://localhost:8080/sms/send
+    whatsapp-url: http://localhost:8080/whatsapp/send
+
+frontend:
+  origin: http://localhost:3000
 
 resilience4j:
   circuitbreaker:

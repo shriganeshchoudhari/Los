@@ -10,6 +10,7 @@ import { ApplicationCard, StatusBadge } from '@/components/ui/components';
 import { loanApi } from '@/lib/api';
 import { formatCurrency, timeAgo } from '@/lib/utils';
 import { useAuth } from '@/lib/use-auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Tab = 'ALL' | 'MY_QUEUE' | 'PENDING_DOCS' | 'PENDING_APPROVAL' | 'SANCTIONED';
 
@@ -27,7 +28,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<Tab>('ALL');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [profile, setProfile] = useState<{ fullName?: string; role?: string; branchName?: string } | null>(null);
+  const [profile, setProfile] = useState<{ name?: string; fullName?: string; role?: string; branchName?: string } | null>(null);
 
   useEffect(() => {
     import('@/lib/api').then(({ authApi }) => {
@@ -82,11 +83,19 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium">{profile?.name ?? 'Loading...'}</p>
-                <p className="text-xs text-muted-foreground">{profile?.role ? profile.role.replace(/_/g, ' ') : '—'}</p>
+                {profile?.name || profile?.fullName ? (
+                  <p className="text-sm font-medium">{profile.name || profile.fullName}</p>
+                ) : (
+                  <Skeleton className="h-5 w-24 ml-auto mb-1" />
+                )}
+                {profile?.role ? (
+                  <p className="text-xs text-muted-foreground">{profile.role.replace(/_/g, ' ')}</p>
+                ) : (
+                  <Skeleton className="h-4 w-20 ml-auto" />
+                )}
               </div>
               <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm">
-                {profile?.name ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '??'}
+                {(profile?.name || profile?.fullName) ? (profile.name || profile.fullName)!.split(' ').map((n: string) => n[0]).join('').toUpperCase() : '??'}
               </div>
               <Button variant="ghost" size="sm" onClick={logout}>Logout</Button>
             </div>
@@ -189,7 +198,7 @@ export default function DashboardPage() {
           <CardContent>
             {isLoading ? (
               <div className="space-y-3">
-                {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-lg animate-pulse" />)}
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
               </div>
             ) : applications.length === 0 ? (
               <div className="text-center py-12">
@@ -202,7 +211,7 @@ export default function DashboardPage() {
                   <div
                     key={app.id}
                     className="flex items-center gap-4 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/application/${app.id}`)}
+                    onClick={() => router.push(`/dashboard/applications/${app.id}`)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

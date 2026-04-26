@@ -12,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
+import com.los.loan.service.SseEmitterService;
 
 @Slf4j
 @RestController
@@ -23,6 +26,7 @@ public class LoanApplicationController {
     private final LoanApplicationService loanApplicationService;
     private final SanctionLetterService sanctionLetterService;
     private final PddService pddService;
+    private final SseEmitterService sseEmitterService;
 
     /**
      * Create new loan application
@@ -131,5 +135,15 @@ public class LoanApplicationController {
         log.info("Getting PDD status");
         ApiResponse<java.util.Map<String, Object>> response = pddService.getPddCompletionStatus(applicationId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * SSE status stream
+     */
+    @GetMapping(value = "/applications/{applicationId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Subscribe to application events", description = "Get real-time updates for application status/stage")
+    public SseEmitter subscribeToEvents(@PathVariable String applicationId) {
+        log.info("SSE subscription request for application: {}", applicationId);
+        return sseEmitterService.subscribe(applicationId);
     }
 }

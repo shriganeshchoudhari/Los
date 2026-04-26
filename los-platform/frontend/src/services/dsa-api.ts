@@ -49,7 +49,7 @@ dsaApi.interceptors.response.use(
     if (error.response?.status === 429) {
       toast.error('Too many requests. Please wait a moment.');
     }
-    if (error.response?.status >= 500) {
+    if ((error.response?.status ?? 0) >= 500) {
       toast.error('Server error. Please try again later.');
     }
 

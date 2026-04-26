@@ -1,9 +1,13 @@
 package com.los.document.controller;
 
 import com.los.document.dto.*;
+import com.los.document.entity.Document;
+import com.los.document.entity.DocumentStatus;
 import com.los.document.entity.SigningLog;
+import com.los.document.repository.DocumentRepository;
 import com.los.document.service.DocumentService;
 import com.los.common.dto.ApiResponse;
+import com.los.common.exception.LosException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,87 +19,130 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
 @RequestMapping("/api/documents")
 @RequiredArgsConstructor
-@Tag(name = "Documents", description = "Document management APIs (Upload, OCR, eSign, Watermark)")
+@Tag(name = "Documents", description = "Document management — upload, OCR, watermark, eSign")
 @SecurityRequirement(name = "bearerAuth")
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final DocumentRepository documentRepository;
+
+    // ── Presigned upload URL ──────────────────────────────────────────────────
 
     @PostMapping("/presigned-url")
-    @Operation(summary = "Get S3 presigned URL", description = "Generate presigned URL for document upload")
+    @Operation(summary = "Get presigned upload URL")
     public ResponseEntity<ApiResponse<PresignedUrlResponseDto>> getPresignedUrl(
             @Valid @RequestBody PresignedUrlDto dto) {
-        log.info("POST /api/documents/presigned-url - Application: {}", dto.getApplicationId());
-
-        PresignedUrlResponseDto response = documentService.getPresignedUrl(dto);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "Presigned URL generated successfully"));
+        log.info("POST /api/documents/presigned-url — application: {}", dto.getApplicationId());
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getPresignedUrl(dto), "Presigned URL generated"));
     }
+
+    // ── Get document ──────────────────────────────────────────────────────────
 
     @GetMapping("/{documentId}")
-    @Operation(summary = "Retrieve document", description = "Get document details and download URL")
+    @Operation(summary = "Get document metadata")
     public ResponseEntity<ApiResponse<DocumentStatusDto>> getDocument(
             @PathVariable String documentId) {
-        log.info("GET /api/documents/{} - Fetching document", documentId);
-
-        DocumentStatusDto response = documentService.getDocumentStatus(documentId);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "Document retrieved successfully"));
+        log.info("GET /api/documents/{}", documentId);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getDocumentStatus(documentId), "Document retrieved"));
     }
+
+    // ── OCR (POST — trigger, GET — fetch result) ──────────────────────────────
 
     @PostMapping("/ocr")
-    @Operation(summary = "Run OCR on image", description = "Extract text from document image using OCR")
+    @Operation(summary = "Trigger OCR on a document")
     public ResponseEntity<ApiResponse<OcrResponseDto>> performOcr(
             @Valid @RequestBody OcrRequestDto dto) {
-        log.info("POST /api/documents/ocr - Document: {}", dto.getDocumentId());
-
-        OcrResponseDto response = documentService.performOcr(dto);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "OCR completed successfully"));
+        log.info("POST /api/documents/ocr — document: {}", dto.getDocumentId());
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.performOcr(dto), "OCR completed"));
     }
 
+    /**
+     * GET /{id}/ocr — Returns the OCR result for a document that has already been processed.
+     * The frontend calls this endpoint via documentApi.getOcrResult(documentId).
+     */
+    @GetMapping("/{id}/ocr")
+    @Operation(summary = "Get OCR result for a document")
+    public ResponseEntity<ApiResponse<OcrResponseDto>> getOcrResult(
+            @PathVariable String id) {
+        log.info("GET /api/documents/{}/ocr", id);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getOcrResult(id), "OCR result retrieved"));
+    }
+
+    // ── Watermark ─────────────────────────────────────────────────────────────
+
     @PostMapping("/{id}/watermark")
-    @Operation(summary = "Add watermark to PDF", description = "Add watermark to PDF document")
+    @Operation(summary = "Apply watermark to PDF document")
     public ResponseEntity<ApiResponse<DocumentStatusDto>> addWatermark(
             @PathVariable String id,
             @Valid @RequestBody WatermarkRequestDto dto) {
-        log.info("POST /api/documents/{}/watermark - Adding watermark", id);
-
-        DocumentStatusDto response = documentService.addWatermark(dto);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "Watermark added successfully"));
+        log.info("POST /api/documents/{}/watermark", id);
+        dto.setDocumentId(id);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.addWatermark(dto), "Watermark applied"));
     }
+
+    // ── Approve / reject ──────────────────────────────────────────────────────
+
+    @PostMapping("/{id}/approve")
+    @Operation(summary = "Approve a document (officer review)")
+    public ResponseEntity<ApiResponse<DocumentStatusDto>> approveDocument(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, String> body) {
+        log.info("POST /api/documents/{}/approve", id);
+        String remarks = body != null ? body.getOrDefault("remarks", "") : "";
+        Document doc = documentRepository.findById(id)
+                .orElseThrow(() -> new LosException("DOC_001", "Document not found", 404, false));
+        doc.setVerificationStatus(DocumentStatus.VERIFIED);
+        // Add remarks to metadata or somewhere if needed, currently no field in table
+        documentRepository.save(doc);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getDocumentStatus(id), "Document approved"));
+    }
+
+    @PostMapping("/{id}/reject")
+    @Operation(summary = "Reject a document (officer review)")
+    public ResponseEntity<ApiResponse<DocumentStatusDto>> rejectDocument(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        log.info("POST /api/documents/{}/reject", id);
+        String reason = body != null ? body.getOrDefault("reason", "Rejected") : "Rejected";
+        Document doc = documentRepository.findById(id)
+                .orElseThrow(() -> new LosException("DOC_001", "Document not found", 404, false));
+        doc.setVerificationStatus(DocumentStatus.REJECTED);
+        documentRepository.save(doc);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getDocumentStatus(id), "Document rejected"));
+    }
+
+    // ── eSign status ──────────────────────────────────────────────────────────
 
     @GetMapping("/signing-status/{id}")
-    @Operation(summary = "Check eSign status", description = "Get status of eSign request")
+    @Operation(summary = "Check eSign status")
     public ResponseEntity<ApiResponse<SigningLog>> getSigningStatus(
             @PathVariable String id) {
-        log.info("GET /api/documents/signing-status/{} - Fetching status", id);
-
-        SigningLog response = documentService.getSigningStatus(id);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "Signing status retrieved successfully"));
+        log.info("GET /api/documents/signing-status/{}", id);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getSigningStatus(id), "Signing status retrieved"));
     }
 
+    // ── List by application ───────────────────────────────────────────────────
+
     @GetMapping("/application/{applicationId}")
-    @Operation(summary = "Get application documents", description = "List all documents for application")
+    @Operation(summary = "List all documents for an application")
     public ResponseEntity<ApiResponse<List<DocumentStatusDto>>> getApplicationDocuments(
             @PathVariable String applicationId) {
-        log.info("GET /api/documents/application/{} - Fetching documents", applicationId);
-
-        List<DocumentStatusDto> response = documentService.getApplicationDocuments(applicationId);
-        return ResponseEntity
-                .status(HttpStatus.OK)
-                .body(ApiResponse.success(response, "Documents retrieved successfully"));
+        log.info("GET /api/documents/application/{}", applicationId);
+        return ResponseEntity.ok(
+            ApiResponse.success(documentService.getApplicationDocuments(applicationId), "Documents retrieved"));
     }
 }

@@ -16,6 +16,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
     @Query("SELECT r FROM RefreshToken r WHERE r.jti = :jti AND r.isRevoked = false AND r.expiresAt > :now")
     Optional<RefreshToken> findActiveByJti(@Param("jti") String jti, @Param("now") LocalDateTime now);
 
+    Optional<RefreshToken> findByJti(String jti);
+
     @Query("SELECT r FROM RefreshToken r WHERE r.userId = :userId AND r.isRevoked = false AND r.expiresAt > :now")
     List<RefreshToken> findActiveByUser(@Param("userId") String userId, @Param("now") LocalDateTime now);
 

@@ -5,6 +5,7 @@ import com.los.loan.dto.UpdateApplicationDto;
 import com.los.loan.dto.ApplicationResponseDto;
 import com.los.loan.dto.ManagerDecisionDto;
 import com.los.loan.entity.LoanApplication;
+import com.los.loan.entity.LoanStatus;
 import com.los.loan.repository.LoanApplicationRepository;
 import com.los.common.dto.ApiResponse;
 import com.los.common.exception.LosException;
@@ -23,6 +24,7 @@ import java.time.LocalDate;
 public class LoanApplicationService {
 
     private final LoanApplicationRepository loanApplicationRepository;
+    private final SseEmitterService sseEmitterService;
 
     public ApiResponse<ApplicationResponseDto> createApplication(CreateLoanApplicationDto dto) {
         log.info("Creating new loan application for customer: {}", dto.getCustomerId());
@@ -33,7 +35,7 @@ public class LoanApplicationService {
         application.setLoanType(dto.getLoanType());
         application.setRequestedAmount(dto.getRequestedAmount());
         application.setTenureMonths(0); // Will be set during approval
-        application.setStatus("DRAFT");
+        application.setStatus(LoanStatus.DRAFT);
         application.setApplicationDate(LocalDate.now());
         application.setEmploymentType(dto.getEmploymentType());
         application.setAnnualIncome(dto.getAnnualIncome());
@@ -41,12 +43,10 @@ public class LoanApplicationService {
 
         LoanApplication saved = loanApplicationRepository.save(application);
 
-        ApplicationResponseDto response = new ApplicationResponseDto();
-        response.setApplicationId(saved.getId());
-        response.setApplicationNumber(saved.getApplicationNumber());
-        response.setStatus("DRAFT");
+        sseEmitterService.sendEvent(saved.getId(), "STATUS_UPDATE", "DRAFT");
+
+        ApplicationResponseDto response = mapToDto(saved);
         response.setMessage("Application created successfully");
-        response.setCreatedAt(java.time.LocalDateTime.now());
 
         return ApiResponse.success(response, "Application created successfully");
     }
@@ -57,7 +57,7 @@ public class LoanApplicationService {
         LoanApplication application = loanApplicationRepository.findById(dto.getApplicationId())
             .orElseThrow(() -> new LosException("LOAN_001", "Application not found", 404, false));
 
-        if ("SUBMITTED".equals(application.getStatus()) || "APPROVED".equals(application.getStatus())) {
+        if (LoanStatus.SUBMITTED.equals(application.getStatus()) || LoanStatus.SANCTIONED.equals(application.getStatus())) {
             throw new LosException("LOAN_002", "Cannot update submitted or approved applications", 409, false);
         }
 
@@ -76,10 +76,9 @@ public class LoanApplicationService {
 
         LoanApplication saved = loanApplicationRepository.save(application);
 
-        ApplicationResponseDto response = new ApplicationResponseDto();
-        response.setApplicationId(saved.getId());
-        response.setApplicationNumber(saved.getApplicationNumber());
-        response.setStatus(saved.getStatus());
+        sseEmitterService.sendEvent(saved.getId(), "UPDATE", "Application updated");
+
+        ApplicationResponseDto response = mapToDto(saved);
         response.setMessage("Application updated successfully");
 
         return ApiResponse.success(response, "Application updated successfully");
@@ -91,13 +90,7 @@ public class LoanApplicationService {
         LoanApplication application = loanApplicationRepository.findById(applicationId)
             .orElseThrow(() -> new LosException("LOAN_001", "Application not found", 404, false));
 
-        ApplicationResponseDto response = new ApplicationResponseDto();
-        response.setApplicationId(application.getId());
-        response.setApplicationNumber(application.getApplicationNumber());
-        response.setStatus(application.getStatus());
-        response.setCreatedAt(application.getCreatedAt());
-
-        return ApiResponse.success(response, "Application details retrieved");
+        return ApiResponse.success(mapToDto(application), "Application details retrieved");
     }
 
     public ApiResponse<Void> submitApplication(String applicationId) {
@@ -106,13 +99,15 @@ public class LoanApplicationService {
         LoanApplication application = loanApplicationRepository.findById(applicationId)
             .orElseThrow(() -> new LosException("LOAN_001", "Application not found", 404, false));
 
-        if (!"DRAFT".equals(application.getStatus())) {
+        if (application.getStatus() != LoanStatus.DRAFT) {
             throw new LosException("LOAN_003", "Only draft applications can be submitted", 400, false);
         }
 
-        application.setStatus("SUBMITTED");
+        application.setStatus(LoanStatus.SUBMITTED);
         application.setSubmittedAt(java.time.LocalDateTime.now());
         loanApplicationRepository.save(application);
+
+        sseEmitterService.sendEvent(applicationId, "STATUS_UPDATE", "SUBMITTED");
 
         return ApiResponse.success(null, "Application submitted successfully");
     }
@@ -140,24 +135,24 @@ public class LoanApplicationService {
                 } else if (dto.getApprovalTenureMonths() != null) {
                     application.setTenureMonths(dto.getApprovalTenureMonths());
                 }
-                application.setStatus("SANCTIONED");
+                application.setStatus(LoanStatus.SANCTIONED);
             }
             case "REJECTED", "REJECT" -> {
                 if (dto.getRemarks() == null || dto.getRemarks().isBlank()) {
                     throw new LosException("LOAN_011", "Rejection remarks are required", 400, false);
                 }
-                application.setStatus("REJECTED");
+                application.setStatus(LoanStatus.REJECTED);
+                application.setRejectionReason(dto.getRemarks());
             }
-            default -> application.setStatus("PENDING_REVIEW");
+            default -> application.setStatus(LoanStatus.UNDER_REVIEW);
         }
 
         application.setApprovedAt(java.time.LocalDateTime.now());
         LoanApplication saved = loanApplicationRepository.save(application);
 
-        ApplicationResponseDto response = new ApplicationResponseDto();
-        response.setApplicationId(saved.getId());
-        response.setApplicationNumber(saved.getApplicationNumber());
-        response.setStatus(saved.getStatus());
+        sseEmitterService.sendEvent(saved.getId(), "STATUS_UPDATE", saved.getStatus().name());
+
+        ApplicationResponseDto response = mapToDto(saved);
         response.setMessage("Decision recorded: " + action);
         return ApiResponse.success(response, "Manager decision applied successfully");
     }
@@ -166,23 +161,38 @@ public class LoanApplicationService {
         log.info("Fetching paginated loan applications");
         org.springframework.data.domain.Page<LoanApplication> page = loanApplicationRepository.findAll(pageable);
         
-        org.springframework.data.domain.Page<ApplicationResponseDto> dtoPage = page.map(app -> {
-            ApplicationResponseDto dto = new ApplicationResponseDto();
-            dto.setApplicationId(app.getId());
-            dto.setApplicationNumber(app.getApplicationNumber());
-            dto.setStatus(app.getStatus());
-            dto.setCreatedAt(app.getCreatedAt());
-            
-            // Add useful data for the list view
-            java.util.Map<String, Object> data = new java.util.HashMap<>();
-            data.put("loanType", app.getLoanType());
-            data.put("amount", app.getRequestedAmount());
-            data.put("customerId", app.getCustomerId());
-            dto.setData(data);
-            
-            return dto;
-        });
+        org.springframework.data.domain.Page<ApplicationResponseDto> dtoPage = page.map(this::mapToDto);
 
         return ApiResponse.success(dtoPage, "Applications retrieved successfully");
+    }
+
+    // ── Private mapper ────────────────────────────────────────────────────────
+
+    private ApplicationResponseDto mapToDto(LoanApplication app) {
+        ApplicationResponseDto dto = new ApplicationResponseDto();
+        dto.setApplicationId(app.getId());
+        dto.setApplicationNumber(app.getApplicationNumber());
+        dto.setStatus(app.getStatus());
+        dto.setCustomerId(app.getCustomerId());
+        dto.setLoanType(app.getLoanType());
+        dto.setRequestedAmount(app.getRequestedAmount());
+        dto.setSanctionAmount(app.getSanctionAmount());
+        dto.setNetDisbursedAmount(app.getNetDisbursedAmount());
+        dto.setTenureMonths(app.getTenureMonths());
+        dto.setEmploymentType(app.getEmploymentType());
+        dto.setAnnualIncome(app.getAnnualIncome());
+        dto.setCreditScore(app.getCreditScore());
+        dto.setAssignedToUserId(app.getAssignedToUserId());
+        dto.setApplicationDate(app.getApplicationDate());
+        dto.setSubmittedAt(app.getSubmittedAt());
+        dto.setApprovedAt(app.getApprovedAt());
+        dto.setRejectedAt(app.getRejectedAt());
+        dto.setRejectionReason(app.getRejectionReason());
+        dto.setCreatedAt(app.getCreatedAt());
+        dto.setUpdatedAt(app.getUpdatedAt() != null ? app.getUpdatedAt() : app.getCreatedAt());
+        dto.setApplicantName("Customer #" + (app.getCustomerId() != null
+                ? app.getCustomerId().substring(0, Math.min(8, app.getCustomerId().length()))
+                : "UNKNOWN"));
+        return dto;
     }
 }

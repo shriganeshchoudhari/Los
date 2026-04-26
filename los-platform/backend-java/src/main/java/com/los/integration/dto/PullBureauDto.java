@@ -26,4 +26,8 @@ public class PullBureauDto {
     private String consentId;
 
     private String consentTimestamp;
+    
+    private String name;
+    private String dob;
+    private String mobile;
 }

@@ -72,6 +72,12 @@ public class User extends BaseEntity {
     @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 
+    @Column(name = "branch_code", length = 20)
+    private String branchCode;
+
+    @Column(name = "branch_name", length = 100)
+    private String branchName;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean isDeleted = false;
 

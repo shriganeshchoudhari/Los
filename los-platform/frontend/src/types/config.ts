@@ -3,8 +3,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { UUID, PaisaAmount, ISODateString, ISODateTimeString } from './shared';
-import type { LoanType, EmploymentType, DocumentType } from './loan';
+import type { LoanType, EmploymentType } from './loan';
 import type { UserRole } from './auth';
+import type { BenchmarkRateType } from './decision';
+import type { DocumentType } from './documents';
 
 export interface ConditionalDocumentRule {
   condition: string;
@@ -54,7 +56,7 @@ export interface RateLimitConfig {
   keyStrategy: 'IP' | 'USER_ID' | 'API_KEY' | 'IP_AND_USER';
 }
 
-export type BenchmarkRateType = 'MCLR_1Y' | 'MCLR_3M' | 'REPO_RATE' | 'T_BILL_91D';
+// BenchmarkRateType is defined in decision.ts; referenced here via import
 
 export interface BenchmarkRate {
   type: BenchmarkRateType;

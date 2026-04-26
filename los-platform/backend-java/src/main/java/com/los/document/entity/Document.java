@@ -18,44 +18,41 @@ public class Document extends BaseEntity {
     @Column(name = "application_id", nullable = false)
     private String applicationId;
 
-    @Column(name = "document_name", nullable = false, length = 200)
-    private String documentName;
+    @Column(name = "user_id", nullable = false)
+    private java.util.UUID userId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "document_type", nullable = false)
     private DocumentType documentType;
 
-    @Column(name = "s3_key", nullable = false, length = 500)
-    private String s3Key;
+    @Column(name = "category")
+    private String category;
 
-    @Column(name = "file_size")
-    private Long fileSize;
+    @Column(name = "file_name", nullable = false)
+    private String fileName;
 
-    @Column(name = "file_extension", length = 20)
-    private String fileExtension;
+    @Column(name = "storage_key", nullable = false)
+    private String storageKey;
 
-    @Column(name = "mime_type", length = 100)
+    @Column(name = "mime_type")
     private String mimeType;
 
+    @Column(name = "file_size_bytes")
+    private Long fileSizeBytes;
+
+    @Column(name = "checksum")
+    private String checksum;
+
+    @Column(name = "ocr_data", columnDefinition = "jsonb")
+    private String ocrData;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private DocumentStatus status = DocumentStatus.UPLOADED;
+    @Column(name = "verification_status")
+    private DocumentStatus verificationStatus;
 
-    @Column(name = "uploaded_by", length = 100)
-    private String uploadedBy;
+    @Column(name = "verified_by")
+    private java.util.UUID verifiedBy;
 
-    @Column(name = "verified_by", length = 100)
-    private String verifiedBy;
-
-    @Column(name = "verification_remarks", length = 500)
-    private String verificationRemarks;
-
-    @Column(name = "expiry_date")
-    private String expiryDate;
-
-    @Column(name = "metadata", columnDefinition = "jsonb")
-    private String metadata;
-
-    @Column(name = "tags", length = 500)
-    private String tags;
+    @Column(name = "verified_at")
+    private java.time.Instant verifiedAt;
 }

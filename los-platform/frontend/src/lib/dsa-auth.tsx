@@ -40,9 +40,9 @@ export function DSAAuthProvider({ children }: { children: React.ReactNode }) {
 
     if (accessToken && refreshToken) {
       setState({
-        partnerId,
-        partnerCode,
-        partnerName,
+        partnerId: partnerId ?? null,
+        partnerCode: partnerCode ?? null,
+        partnerName: partnerName ?? null,
         role: role || null,
         isAuthenticated: true,
         isLoading: false,

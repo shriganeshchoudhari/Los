@@ -1,4 +1,4 @@
-# Playwright E2E Test Suite - LOS Platform
+// Playwright E2E Test Suite - LOS Platform
 
 const { test, expect } = require('@playwright/test');
 

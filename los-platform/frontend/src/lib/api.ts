@@ -9,7 +9,7 @@ const AUTH_SERVICE_URL = getBaseURL('NEXT_PUBLIC_AUTH_SERVICE_URL', 'http://loca
 const KYC_SERVICE_URL = getBaseURL('NEXT_PUBLIC_KYC_SERVICE_URL', 'http://localhost:8082/api');
 const LOAN_SERVICE_URL = getBaseURL('NEXT_PUBLIC_LOAN_SERVICE_URL', 'http://localhost:8082/api');
 const DOCUMENT_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DOCUMENT_SERVICE_URL', 'http://localhost:8082/api');
-const DECISION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DECISION_SERVICE_URL', 'http://localhost:8082/api');
+const DECISION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DECISION_SERVICE_URL', 'http://localhost:8082/api/decisions');
 const INTEGRATION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_INTEGRATION_SERVICE_URL', 'http://localhost:8082/api');
 const NOTIFICATION_SERVICE_URL = getBaseURL('NEXT_PUBLIC_NOTIFICATION_SERVICE_URL', 'http://localhost:8082/api');
 const DSA_SERVICE_URL = getBaseURL('NEXT_PUBLIC_DSA_SERVICE_URL', 'http://localhost:8082/api');
@@ -162,16 +162,19 @@ export const bureauApi = {
 };
 
 export const decisionApi = {
-  trigger: (applicationId: string) =>
-    decisionSvc.post(`/decisions/trigger`, { applicationId }),
-  get: (applicationId: string) => decisionSvc.get(`/decisions/${applicationId}`),
-  override: (applicationId: string, decision: string, status: string, reason: string) =>
-    decisionSvc.post('/decisions/override', { 
-      applicationId, 
-      decision, 
-      status, 
-      remarks: reason 
-    }),
+  trigger: (applicationId: string) => decisionSvc.post('/trigger', { applicationId }),
+  get: (applicationId: string) => decisionSvc.get(`/${applicationId}`),
+  override: (data: {
+    applicationId: string;
+    status?: string;
+    decision?: string;
+    action?: 'APPROVED' | 'REJECTED';
+    remarks?: string;
+    sanctionedAmount?: number;
+    approvedAmount?: number;
+    approvedTenureMonths?: number;
+  }) => decisionSvc.post('/override', data),
+  getHistory: (applicationId: string) => decisionSvc.get(`/${applicationId}/history`),
 };
 
 export const disbursementApi = {

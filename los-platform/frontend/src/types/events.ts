@@ -3,8 +3,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { UUID, PaisaAmount, ISODateTimeString } from './shared';
-import type { LoanType, ChannelCode, ApplicationStatus, KYCStatus, BureauProvider, BureauJobStatus } from './loan';
+import type { LoanType, ChannelCode, ApplicationStatus } from './loan';
 import type { DecisionStatus } from './decision';
+import type { KYCStatus } from './kyc';
+import type { BureauProvider, BureauJobStatus } from './bureau';
 
 export type KafkaTopic =
   | 'los.application.submitted'

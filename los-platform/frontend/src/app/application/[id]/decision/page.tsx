@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge, ProgressStages } from '@/components/ui/components';
 import { decisionApi, bureauApi } from '@/lib/api';
 import { formatCurrency, formatCurrencyFull } from '@/lib/utils';
+import { Info } from 'lucide-react';
 
 const DECISION_STEPS = [
   { key: 'SUBMITTED', label: 'Submitted' },
@@ -218,9 +219,9 @@ export default function DecisionPage() {
                 </div>
               ))}
               <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Reason: {decision?.rejectionReasonCode || application?.rejectionReasonCode || 'Credit assessment criteria not met'}
-                </p>
+                  <p className="text-xs text-muted-foreground">
+                    Reason: {String(decision?.rejectionReasonCode || application?.rejectionReasonCode || 'Credit assessment criteria not met')}
+                  </p>
               </div>
             </CardContent>
           </Card>
@@ -232,6 +233,40 @@ export default function DecisionPage() {
               Return to Home
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (decisionType === 'MANUAL_OVERRIDE' || decisionType === 'OVERRIDE_PENDING' || application?.status === 'UNDER_REVIEW') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="max-w-md w-full p-6 text-center space-y-6">
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <Info className="w-10 h-10 text-blue-600" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-slate-800">Application Under Review</h1>
+            <p className="text-muted-foreground">
+              Your application has been referred for manual review by our credit team. 
+              A loan officer will contact you if additional information is required.
+            </p>
+          </div>
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4 text-left space-y-3">
+              <h3 className="font-semibold text-sm text-blue-800">Current Status:</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+                <span className="text-sm font-medium text-blue-700">Manual Assessment in Progress</span>
+              </div>
+              <p className="text-xs text-blue-600/80">
+                Estimated turnaround time: 24-48 business hours. You will receive an SMS and Email once a final decision is made.
+              </p>
+            </CardContent>
+          </Card>
+          <Button variant="outline" className="w-full" onClick={() => router.push('/dashboard')}>
+            Back to Dashboard
+          </Button>
         </div>
       </div>
     );

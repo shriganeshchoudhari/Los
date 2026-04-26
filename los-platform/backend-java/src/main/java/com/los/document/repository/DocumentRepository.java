@@ -18,19 +18,19 @@ public interface DocumentRepository extends JpaRepository<Document, String> {
 
     Optional<Document> findByApplicationIdAndDocumentType(String applicationId, DocumentType documentType);
 
-    List<Document> findByStatus(DocumentStatus status);
+    List<Document> findByVerificationStatus(DocumentStatus status);
 
-    @Query("SELECT d FROM Document d WHERE d.applicationId = :applicationId AND d.status = :status")
+    @Query("SELECT d FROM Document d WHERE d.applicationId = :applicationId AND d.verificationStatus = :status")
     List<Document> findByApplicationIdAndStatus(
             @Param("applicationId") String applicationId,
             @Param("status") DocumentStatus status
     );
 
-    Optional<Document> findByS3Key(String s3Key);
+    Optional<Document> findByStorageKey(String storageKey);
 
     List<Document> findByDocumentType(DocumentType documentType);
 
-    List<Document> findByUploadedBy(String uploadedBy);
+    List<Document> findByUserId(java.util.UUID userId);
 
     @Query("SELECT COUNT(d) FROM Document d WHERE d.applicationId = :applicationId")
     Long countByApplicationId(@Param("applicationId") String applicationId);

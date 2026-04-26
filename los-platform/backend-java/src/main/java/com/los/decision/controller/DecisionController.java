@@ -53,10 +53,12 @@ public class DecisionController {
     @PostMapping("/override")
     @Operation(summary = "Manual override of decision", description = "Override decision with manual approval/rejection")
     public ResponseEntity<ApiResponse<DecisionResponseDto>> manualOverride(
-            @Valid @RequestBody ManualDecisionDto dto) {
+            @Valid @RequestBody ManualDecisionDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
         log.info("POST /api/decisions/override - Application: {}", dto.getApplicationId());
 
-        DecisionResponseDto response = decisionEngineService.manualOverride(dto, com.los.common.security.SecurityConstants.SYSTEM_USER);
+        String userId = (headerUserId != null) ? headerUserId : com.los.common.security.SecurityConstants.SYSTEM_USER;
+        DecisionResponseDto response = decisionEngineService.manualOverride(dto, userId);
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.success(response, "Decision overridden successfully"));
@@ -65,10 +67,12 @@ public class DecisionController {
     @PostMapping("/override/request")
     @Operation(summary = "Request manual override", description = "Create override request (maker in maker-checker flow)")
     public ResponseEntity<ApiResponse<DecisionResponseDto>> requestOverride(
-            @Valid @RequestBody OverrideRequestDto dto) {
+            @Valid @RequestBody OverrideRequestDto dto,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
         log.info("POST /api/decisions/override/request - Application: {}", dto.getApplicationId());
 
-        DecisionResponseDto response = decisionEngineService.requestOverride(dto, com.los.common.security.SecurityConstants.SYSTEM_USER);
+        String userId = (headerUserId != null) ? headerUserId : com.los.common.security.SecurityConstants.SYSTEM_USER;
+        DecisionResponseDto response = decisionEngineService.requestOverride(dto, userId);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response, "Override request created successfully"));

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoneyInput, ProgressStages, StatusBadge } from '@/components/ui/components';
 import { loanApi, kycApi } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const STEPS = [
   { key: 'PERSONAL', label: 'Personal Details' },
@@ -204,7 +205,31 @@ export default function ApplicationFormPage() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <header className="bg-white border-b sticky top-0 z-10">
+          <div className="container py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Skeleton className="w-8 h-8 rounded-lg" />
+              <Skeleton className="w-24 h-6" />
+            </div>
+            <Skeleton className="w-20 h-6 rounded-full" />
+          </div>
+        </header>
+        <main className="container py-8">
+          <div className="max-w-3xl mx-auto space-y-8">
+            <Skeleton className="w-full h-16 rounded-lg" />
+            <div className="space-y-6">
+              <Skeleton className="w-full h-[400px] rounded-xl" />
+              <div className="flex justify-between">
+                <Skeleton className="w-24 h-10" />
+                <Skeleton className="w-32 h-10" />
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -216,14 +241,14 @@ export default function ApplicationFormPage() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-sm">₹</div>
               <span className="font-bold">LOS Bank</span>
             </div>
-            {application.applicationNumber && (
+            {(application.applicationNumber as string) && (
               <div className="border-l pl-4">
                 <p className="text-xs text-muted-foreground">Application</p>
                 <p className="font-mono text-sm font-semibold">{application.applicationNumber as string}</p>
               </div>
             )}
           </div>
-          {application.status && (
+          {(application.status as string) && (
             <StatusBadge status={application.status as string} />
           )}
         </div>
