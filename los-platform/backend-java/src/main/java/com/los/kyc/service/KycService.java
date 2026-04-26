@@ -103,7 +103,6 @@ public class KycService {
                 .build();
     }
 
-    @SuppressWarnings("unused")
     public AadhaarInitResponseDto initiateAadhaarKycFallback(InitiateAadhaarKycDto dto, Throwable t) {
         log.error("UIDAI circuit breaker open for application {}: {}", dto.getApplicationId(), t.getMessage());
         throw new LosException("KYC_010", "Aadhaar service temporarily unavailable. Please retry in 30 seconds.", 503, true);
@@ -175,7 +174,6 @@ public class KycService {
         return formatKycStatus(kycRecord);
     }
 
-    @SuppressWarnings("unused")
     public KycStatusResponseDto verifyAadhaarOtpFallback(VerifyAadhaarOtpDto dto, Throwable t) {
         log.error("UIDAI verify circuit open: {}", t.getMessage());
         throw new LosException("KYC_011", "Aadhaar verification service temporarily unavailable.", 503, true);
@@ -250,7 +248,6 @@ public class KycService {
         return formatKycStatus(kycRecord);
     }
 
-    @SuppressWarnings("unused")
     public KycStatusResponseDto verifyPanFallback(VerifyPanDto dto, Throwable t) {
         log.error("NSDL circuit open: {}", t.getMessage());
         throw new LosException("KYC_012", "PAN verification service temporarily unavailable.", 503, true);
@@ -314,7 +311,6 @@ public class KycService {
         return formatKycStatus(kycRecord);
     }
 
-    @SuppressWarnings("unused")
     public KycStatusResponseDto performFaceMatchFallback(FaceMatchDto dto, Throwable t) {
         log.error("Face match circuit open: {}", t.getMessage());
         throw new LosException("KYC_013", "Face match service temporarily unavailable.", 503, true);
@@ -413,8 +409,6 @@ public class KycService {
         if (tokens1.length == 0 || tokens2.length == 0) return 0;
 
         double totalScore = 0.0;
-        int matchedPairs = 0;
-
         for (String t1 : tokens1) {
             double bestMatch = 0.0;
             for (String t2 : tokens2) {
@@ -427,7 +421,6 @@ public class KycService {
                 bestMatch = Math.max(bestMatch, score);
             }
             totalScore += bestMatch;
-            matchedPairs++;
         }
 
         double finalScore = totalScore / Math.max(tokens1.length, tokens2.length);

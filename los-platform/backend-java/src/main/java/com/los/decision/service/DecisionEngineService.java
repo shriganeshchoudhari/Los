@@ -6,10 +6,9 @@ import com.los.decision.dto.*;
 import com.los.decision.entity.*;
 import com.los.decision.repository.*;
 import com.los.integration.entity.BureauScore;
-import com.los.integration.repository.BureauScoreRepository;
-import com.los.loan.entity.LoanApplication;
-import com.los.loan.entity.LoanStatus;
 import com.los.loan.repository.LoanApplicationRepository;
+import com.los.integration.repository.BureauScoreRepository;
+import com.los.loan.entity.LoanStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -77,7 +76,7 @@ public class DecisionEngineService {
         decision.setDecidedBy("RULE_ENGINE_v1");
 
         Decision saved = decisionRepository.save(decision);
-        
+
         // Synchronize with Loan Application status
         loanApplicationRepository.findById(dto.getApplicationId()).ifPresent(app -> {
             if (saved.getStatus() == DecisionStatus.APPROVED) {
@@ -105,7 +104,8 @@ public class DecisionEngineService {
 
     /**
      * Evaluate a list of {@link DecisionRule}s against the provided context.
-     * Returns an {@link EvaluationOutcome} containing failed rule codes, reasons and hard‑stop flag.
+     * Returns an {@link EvaluationOutcome} containing failed rule codes, reasons
+     * and hard‑stop flag.
      */
     private EvaluationOutcome evaluateRules(List<DecisionRule> rules, Map<String, Object> context) {
         List<String> failed = new ArrayList<>();
@@ -142,7 +142,8 @@ public class DecisionEngineService {
             ctx.put("monthlyIncome", safeDouble(app.getAnnualIncome()) / 12.0);
             ctx.put("loanType", app.getLoanType() != null ? app.getLoanType() : "PERSONAL_LOAN");
             ctx.put("employmentType", app.getEmploymentType() != null ? app.getEmploymentType() : "SALARIED");
-            ctx.put("applicationStatus", app.getStatus() != null ? app.getStatus().name() : LoanStatus.SUBMITTED.name());
+            ctx.put("applicationStatus",
+                    app.getStatus() != null ? app.getStatus().name() : LoanStatus.SUBMITTED.name());
         });
 
         // Bureau data — use best (highest) credit score from completed pulls
@@ -170,7 +171,8 @@ public class DecisionEngineService {
         double requestedAmount = (double) ctx.getOrDefault("requestedAmount", 0.0);
         int tenureMonths = (int) ctx.getOrDefault("tenureMonths", 0);
         double proposedEmi = tenureMonths > 0 && requestedAmount > 0
-                ? calculateEmi(requestedAmount, tenureMonths, 1100) : 0;
+                ? calculateEmi(requestedAmount, tenureMonths, 1100)
+                : 0;
         ctx.put("proposedEmi", proposedEmi);
         double foir = monthlyIncome > 0 ? ((existingEmi + proposedEmi) / monthlyIncome) * 100 : 100;
         ctx.put("foir", foir);
@@ -205,21 +207,23 @@ public class DecisionEngineService {
     private RuleResult evaluateRule(DecisionRule rule, Map<String, Object> context) {
         try {
             JsonNode root = objectMapper.readTree(rule.getRuleDefinition());
-            if (!root.isArray()) return new RuleResult(true, false, "");
+            if (!root.isArray())
+                return new RuleResult(true, false, "");
 
             for (JsonNode condition : root) {
                 String rawField = condition.path("field").asText("");
                 String operator = condition.path("operator").asText(">=");
                 double threshold = condition.path("value").asDouble(0); // V010 uses 'value', not 'threshold'
-                
+
                 // Map legacy field names to context keys
                 String field = mapField(rawField);
-                
+
                 Object rawValue = context.get(field);
                 if (rawValue == null) {
                     // Fail if it's a hard-stop category or explicit mandatory flag
                     if (rule.getRuleCode().startsWith("CR") || rule.getRuleCode().startsWith("FO")) {
-                        return new RuleResult(false, true, "Field '" + field + "' not available for " + rule.getRuleName());
+                        return new RuleResult(false, true,
+                                "Field '" + field + "' not available for " + rule.getRuleName());
                     }
                     continue;
                 }
@@ -255,15 +259,15 @@ public class DecisionEngineService {
 
     private boolean evaluate(double value, String operator, double threshold) {
         return switch (operator) {
-            case ">="  -> value >= threshold;
-            case ">"   -> value > threshold;
-            case "<="  -> value <= threshold;
-            case "<"   -> value < threshold;
-            case "=="  -> Math.abs(value - threshold) < 0.001;
-            case "!="  -> Math.abs(value - threshold) >= 0.001;
-            case "eq"  -> Math.abs(value - threshold) < 0.001;
+            case ">=" -> value >= threshold;
+            case ">" -> value > threshold;
+            case "<=" -> value <= threshold;
+            case "<" -> value < threshold;
+            case "==" -> Math.abs(value - threshold) < 0.001;
+            case "!=" -> Math.abs(value - threshold) >= 0.001;
+            case "eq" -> Math.abs(value - threshold) < 0.001;
             case "neq" -> Math.abs(value - threshold) >= 0.001;
-            default    -> {
+            default -> {
                 log.warn("Unknown operator: {}", operator);
                 yield true;
             }
@@ -276,19 +280,19 @@ public class DecisionEngineService {
         int creditScore = (int) context.getOrDefault("creditScore", 700);
 
         // Spread based on credit score
-        int spreadBps = creditScore >= 750 ? 200 :
-                        creditScore >= 700 ? 300 :
-                        creditScore >= 650 ? 400 : 500;
-        int mclrBps = 875;  // 8.75% MCLR base
+        int spreadBps = creditScore >= 750 ? 200 : creditScore >= 700 ? 300 : creditScore >= 650 ? 400 : 500;
+        int mclrBps = 875; // 8.75% MCLR base
         int totalRateBps = mclrBps + spreadBps;
 
         decision.setApprovedAmount(BigDecimal.valueOf(requestedAmount));
         decision.setApprovedTenureMonths(tenureMonths);
         decision.setInterestRateBps(totalRateBps);
         decision.setSpreadBps(spreadBps);
-        // benchmarkRate is a String in the Decision entity; convert numeric value to string
+        // benchmarkRate is a String in the Decision entity; convert numeric value to
+        // string
         decision.setBenchmarkRate(String.valueOf((double) mclrBps / 100));
-        // processingFeePaisa expects a long; calculate 1% of the requested amount in paisa
+        // processingFeePaisa expects a long; calculate 1% of the requested amount in
+        // paisa
         decision.setProcessingFeePaisa((long) (requestedAmount * 100)); // 1% in paisa
         decision.setFoirActual(BigDecimal.valueOf((double) context.getOrDefault("foir", 0.0)));
     }
@@ -297,7 +301,8 @@ public class DecisionEngineService {
 
     public DecisionResponseDto getDecision(String applicationId) {
         Decision decision = decisionRepository.findByApplicationId(applicationId)
-                .orElseThrow(() -> new IllegalArgumentException("Decision not found for application: " + applicationId));
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Decision not found for application: " + applicationId));
         return mapToResponse(decision);
     }
 
@@ -329,7 +334,8 @@ public class DecisionEngineService {
             loanApplicationRepository.save(app);
         });
 
-        recordHistory(decision.getId(), dto.getApplicationId(), previousStatus, dto.getStatus(), userId, "Manual override");
+        recordHistory(decision.getId(), dto.getApplicationId(), previousStatus, dto.getStatus(), userId,
+                "Manual override");
         return mapToResponse(updated);
     }
 
@@ -363,8 +369,8 @@ public class DecisionEngineService {
     // ── Utility ───────────────────────────────────────────────────────────────
 
     private void recordHistory(String decisionId, String applicationId,
-                               DecisionStatus before, DecisionStatus after,
-                               String changedBy, String reason) {
+            DecisionStatus before, DecisionStatus after,
+            String changedBy, String reason) {
         DecisionHistory history = new DecisionHistory();
         history.setId(UUID.randomUUID().toString());
         history.setDecisionId(decisionId);
@@ -388,10 +394,15 @@ public class DecisionEngineService {
     }
 
     private double toDouble(Object v) {
-        if (v instanceof Number n) return n.doubleValue();
-        if (v instanceof Boolean b) return b ? 1.0 : 0.0;
-        try { return Double.parseDouble(v.toString()); }
-        catch (Exception e) { return 0.0; }
+        if (v instanceof Number n)
+            return n.doubleValue();
+        if (v instanceof Boolean b)
+            return b ? 1.0 : 0.0;
+        try {
+            return Double.parseDouble(v.toString());
+        } catch (Exception e) {
+            return 0.0;
+        }
     }
 
     private DecisionResponseDto mapToResponse(Decision d) {
@@ -433,5 +444,6 @@ public class DecisionEngineService {
     }
 
     /** Immutable result record for a single rule evaluation. */
-    private record RuleResult(boolean passed, boolean hardStop, String reason) {}
+    private record RuleResult(boolean passed, boolean hardStop, String reason) {
+    }
 }

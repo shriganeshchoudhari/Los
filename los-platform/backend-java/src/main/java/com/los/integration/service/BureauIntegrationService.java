@@ -108,7 +108,6 @@ public class BureauIntegrationService {
         return bureauScoreRepository.save(score);
     }
 
-    @SuppressWarnings("unused")
     public BureauScore pullBureauDataFallback(PullBureauDto dto, Throwable t) {
         log.error("Bureau circuit open for provider {}: {}", dto.getProvider(), t.getMessage());
 

@@ -17,10 +17,10 @@ public class NotificationContractTests {
     @Autowired
     private MockMvc mvc;
 
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
     private org.springframework.web.client.RestTemplate restTemplate;
 
-    @org.springframework.boot.test.mock.mockito.MockBean
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
     private org.springframework.mail.javamail.JavaMailSender mailSender;
 
     @Test

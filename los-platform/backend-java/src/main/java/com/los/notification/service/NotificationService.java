@@ -86,9 +86,9 @@ public class NotificationService {
     private String sendSms(String mobile, String message) {
         if (mobile == null || mobile.isBlank()) { log.warn("SMS skipped — no mobile"); return ""; }
         Map<String, Object> body = Map.of("mobile", mobile, "message", message);
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 smsUrl, HttpMethod.POST,
-                new HttpEntity<>(body, jsonHeaders()), Map.class);
+                new HttpEntity<>(body, jsonHeaders()), new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
         String messageId = response.getBody() != null ? String.valueOf(response.getBody().get("messageId")) : "";
         log.info("SMS sent to {} — messageId: {}", mobile, messageId);
         return messageId;
@@ -97,9 +97,9 @@ public class NotificationService {
     private String sendWhatsApp(String mobile, String message) {
         if (mobile == null || mobile.isBlank()) { log.warn("WhatsApp skipped — no mobile"); return ""; }
         Map<String, Object> body = Map.of("mobile", mobile, "message", message);
-        ResponseEntity<Map> response = restTemplate.exchange(
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 whatsAppUrl, HttpMethod.POST,
-                new HttpEntity<>(body, jsonHeaders()), Map.class);
+                new HttpEntity<>(body, jsonHeaders()), new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
         String messageId = response.getBody() != null ? String.valueOf(response.getBody().get("messageId")) : "";
         log.info("WhatsApp sent to {} — messageId: {}", mobile, messageId);
         return messageId;

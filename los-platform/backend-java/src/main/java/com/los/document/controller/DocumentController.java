@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -99,7 +98,6 @@ public class DocumentController {
             @PathVariable String id,
             @RequestBody(required = false) Map<String, String> body) {
         log.info("POST /api/documents/{}/approve", id);
-        String remarks = body != null ? body.getOrDefault("remarks", "") : "";
         Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new LosException("DOC_001", "Document not found", 404, false));
         doc.setVerificationStatus(DocumentStatus.VERIFIED);
@@ -115,7 +113,6 @@ public class DocumentController {
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         log.info("POST /api/documents/{}/reject", id);
-        String reason = body != null ? body.getOrDefault("reason", "Rejected") : "Rejected";
         Document doc = documentRepository.findById(id)
                 .orElseThrow(() -> new LosException("DOC_001", "Document not found", 404, false));
         doc.setVerificationStatus(DocumentStatus.REJECTED);

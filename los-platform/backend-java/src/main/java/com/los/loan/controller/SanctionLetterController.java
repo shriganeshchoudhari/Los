@@ -1,6 +1,5 @@
 package com.los.loan.controller;
 
-import com.los.common.dto.ApiResponse;
 import com.los.loan.service.SanctionLetterService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

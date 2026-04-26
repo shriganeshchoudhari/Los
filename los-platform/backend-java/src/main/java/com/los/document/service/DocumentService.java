@@ -117,7 +117,7 @@ public class DocumentService {
                     
                     contentStream.beginText();
                     contentStream.setFont(org.apache.pdfbox.pdmodel.font.PDType1Font.HELVETICA_BOLD, 40);
-                    contentStream.setNonStrokingColor(220, 220, 220); // Light gray
+                    contentStream.setNonStrokingColor(0.86f, 0.86f, 0.86f); // Light gray
                     
                     // Simple diagonal positioning
                     contentStream.setTextMatrix(org.apache.pdfbox.util.Matrix.getRotateInstance(Math.toRadians(45), 150, 300));
