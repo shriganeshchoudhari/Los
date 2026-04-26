@@ -94,7 +94,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
 
 interface ApplicationCardProps {
   application: {
-    id: string;
+    applicationId: string;
     applicationNumber: string;
     status: string;
     loanType: string;
@@ -131,10 +131,25 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
             <p className="text-lg font-bold text-green-600">{formatCurrency(application.sanctionedAmount)}</p>
           </div>
         )}
-        <p className="text-xs text-muted-foreground">{timeAgo(application.updatedAt)}</p>
+        <TimeAgo date={application.updatedAt} className="text-xs text-muted-foreground" />
       </div>
     </div>
   );
+}
+
+export function TimeAgo({ date, className }: { date: string | Date; className?: string }) {
+  const [mounted, setMounted] = React.useState(false);
+  const { timeAgo } = require('@/lib/utils');
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <span className={className} aria-hidden="true">...</span>;
+  }
+
+  return <span className={className}>{timeAgo(date)}</span>;
 }
 
 interface OTPDigitInputProps {

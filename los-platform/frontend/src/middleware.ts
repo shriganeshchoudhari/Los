@@ -14,9 +14,9 @@ const AUTH_PATHS = ['/login', '/dsa/login'];
 
 function decodeJWTPayload(token: string): Record<string, unknown> | null {
   try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
+    const base64Payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = atob(base64Payload);
+    return JSON.parse(jsonPayload);
   } catch {
     return null;
   }

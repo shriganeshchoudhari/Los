@@ -24,4 +24,7 @@ public class ManualDecisionDto {
 
     // Primary field for rejection reasons as per contract
     private String rejectionReasonCode;
+
+    private java.math.BigDecimal approvedAmount;
+    private Integer approvedTenureMonths;
 }

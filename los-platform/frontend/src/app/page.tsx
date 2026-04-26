@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MoneyInput } from '@/components/ui/components';
 import { loanApi } from '@/lib/api';
+import { useAuth } from '@/lib/use-auth';
+import { ChevronRight } from 'lucide-react';
 
 const LOAN_PRODUCTS = [
   {
@@ -117,6 +119,7 @@ const LOAN_PRODUCTS = [
 
 export default function HomePage() {
   const router = useRouter();
+  const { user, isAuthenticated, logout } = useAuth();
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
   const [tenure, setTenure] = useState(36);
@@ -135,19 +138,25 @@ export default function HomePage() {
       toast.error(`Minimum loan amount is ${formatCurrency(product?.min || 0)}`);
       return;
     }
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=${encodeURIComponent('/')}`);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data } = await loanApi.create({
+        customerId: user?.id || '',
         loanType: selectedProduct,
-        channelCode: 'ONLINE',
-        loanRequirement: { loanType: selectedProduct, requestedAmount: amount, requestedTenureMonths: tenure },
-        applicant: { fullName: '', mobile: '', dob: '', age: 0, gender: 'MALE', maritalStatus: 'SINGLE', addresses: [], residentialStatus: 'RESIDENT_INDIAN', yearsAtCurrentAddress: 0, ownOrRentedResidence: 'OWNED' },
-        employmentDetails: { employmentType: 'SALARIED_PRIVATE', totalWorkExperienceMonths: 0, grossMonthlyIncome: 0, netMonthlyIncome: 0, totalAnnualIncome: 0 },
-      });
+        requestedAmount: amount,
+        employmentType: 'SALARIED', // Default or pick from a form if added
+        annualIncome: 1200000, // Placeholder
+        purpose: `Apply for ${product?.name}`,
+      } as any);
       toast.success('Application created!');
-      router.push(`/application/${data.applicationId}`);
-    } catch {
-      toast.error('Failed to create application. Please try again.');
+      router.push(`/dashboard`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to create application. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -168,7 +177,16 @@ export default function HomePage() {
             <Link href="/help" className="hover:text-primary">Help</Link>
           </nav>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push('/login')}>Login</Button>
+            {isAuthenticated ? (
+              <div className="flex items-center gap-4">
+                <Link href="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+                  {user?.fullName || 'Dashboard'}
+                </Link>
+                <Button variant="outline" size="sm" onClick={logout}>Logout</Button>
+              </div>
+            ) : (
+              <Button size="sm" onClick={() => router.push('/login')}>Login</Button>
+            )}
           </div>
         </div>
       </header>

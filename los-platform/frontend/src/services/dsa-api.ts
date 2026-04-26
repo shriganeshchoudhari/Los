@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'ax
 import Cookies from 'js-cookie';
 import { toast } from 'sonner';
 
-const DSA_API_BASE = process.env.NEXT_PUBLIC_DSA_API_BASE_URL || 'http://localhost:3008';
+const DSA_API_BASE = process.env.NEXT_PUBLIC_DSA_SERVICE_URL || 'http://localhost:8082/api';
 
 const dsaApi: AxiosInstance = axios.create({
   baseURL: DSA_API_BASE,

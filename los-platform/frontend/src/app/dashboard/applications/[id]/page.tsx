@@ -68,6 +68,16 @@ export default function UnderwritingPage() {
     });
   };
 
+  const handleTriggerDecision = async () => {
+    try {
+      await decisionApi.trigger(id);
+      toast.success('Decision engine triggered');
+      refetchDecision();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to trigger decision');
+    }
+  };
+
   if (appLoading || decLoading) {
     return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
   }
@@ -140,7 +150,7 @@ export default function UnderwritingPage() {
                 <CardDescription>Automated assessment output</CardDescription>
               </div>
               {(!decision || decision.status === 'IN_PROGRESS') && (
-                <Button variant="outline" size="sm" onClick={() => refetchDecision()}>Run Rules</Button>
+                <Button variant="outline" size="sm" onClick={handleTriggerDecision}>Run Rules</Button>
               )}
             </CardHeader>
             <CardContent>

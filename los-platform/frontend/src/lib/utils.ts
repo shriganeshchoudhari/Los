@@ -24,8 +24,10 @@ export function formatCurrencyFull(amount: number | string): string {
   }).format(num);
 }
 
-export function formatDate(date: string | Date, format: 'short' | 'medium' | 'long' = 'medium'): string {
+export function formatDate(date: string | Date | undefined | null, format: 'short' | 'medium' | 'long' = 'medium'): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'N/A';
   const formats: Record<string, Intl.DateTimeFormatOptions> = {
     short: { day: '2-digit', month: '2-digit', year: 'numeric' },
     medium: { day: '2-digit', month: 'short', year: 'numeric' },
@@ -34,8 +36,10 @@ export function formatDate(date: string | Date, format: 'short' | 'medium' | 'lo
   return new Intl.DateTimeFormat('en-IN', formats[format]).format(d);
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date: string | Date | undefined | null): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'N/A';
   return new Intl.DateTimeFormat('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -60,8 +64,10 @@ export function maskAadhaar(aadhaar: string): string {
   return `XXXX-XXXX-${aadhaar.slice(-4)}`;
 }
 
-export function calculateAge(dob: string): number {
+export function calculateAge(dob: string | undefined | null): number {
+  if (!dob) return 0;
   const birthDate = new Date(dob);
+  if (isNaN(birthDate.getTime())) return 0;
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
@@ -90,6 +96,7 @@ export function getStatusColor(status: string): string {
     WITHDRAWN: 'bg-gray-200 text-gray-700',
     CANCELLED: 'bg-gray-200 text-gray-700',
     KYC_FAILED: 'bg-red-100 text-red-800',
+    CANCELLATION_WINDOW: 'bg-orange-100 text-orange-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 }
@@ -116,6 +123,7 @@ export function getStatusLabel(status: string): string {
     WITHDRAWN: 'Withdrawn',
     CANCELLED: 'Cancelled',
     KYC_FAILED: 'KYC Failed',
+    CANCELLATION_WINDOW: 'Cancellation Window',
   };
   return labels[status] || status.replace(/_/g, ' ');
 }
@@ -179,8 +187,10 @@ export function getInitials(name: string): string {
     .substring(0, 2);
 }
 
-export function timeAgo(date: string | Date): string {
+export function timeAgo(date: string | Date | undefined | null): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'invalid date';
   const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
 
   if (seconds < 60) return 'just now';

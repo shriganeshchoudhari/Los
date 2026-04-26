@@ -24,6 +24,12 @@ public class LoanApplication extends BaseEntity {
     @Column(name = "customer_id", nullable = false)
     private String customerId;
 
+    @Column(name = "user_id")
+    private String userId;
+
+    @Column(name = "applicant_full_name")
+    private String applicantFullName;
+
     @Column(name = "loan_type", nullable = false, length = 50)
     private String loanType; // PERSONAL, HOME, AUTO, etc.
 

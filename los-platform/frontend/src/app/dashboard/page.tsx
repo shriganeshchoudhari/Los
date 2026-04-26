@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ApplicationCard, StatusBadge } from '@/components/ui/components';
+import { ApplicationCard, StatusBadge, TimeAgo } from '@/components/ui/components';
 import { loanApi } from '@/lib/api';
 import { formatCurrency, timeAgo } from '@/lib/utils';
 import { useAuth } from '@/lib/use-auth';
@@ -209,9 +209,9 @@ export default function DashboardPage() {
               <div id="application-list" role="tabpanel" aria-label="Application results" className="space-y-3">
                 {applications.map((app: any) => (
                   <div
-                    key={app.id}
+                    key={app.applicationId}
                     className="flex items-center gap-4 p-4 bg-white border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/dashboard/applications/${app.id}`)}
+                    onClick={() => router.push(`/dashboard/applications/${app.applicationId}`)}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -220,7 +220,7 @@ export default function DashboardPage() {
                       </div>
                       <h4 className="font-semibold truncate">{app.applicantName}</h4>
                       <p className="text-xs text-muted-foreground">
-                        {(app.loanType || '').replace(/_/g, ' ')} • {timeAgo(app.updatedAt)}
+                        {(app.loanType || '').replace(/_/g, ' ')} • <TimeAgo date={app.updatedAt} />
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">

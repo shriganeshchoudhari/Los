@@ -17,14 +17,44 @@ public enum LoanStatus {
     /** KYC verified successfully */
     KYC_COMPLETE,
 
+    /** KYC process failed */
+    KYC_FAILED,
+
     /** Awaiting document uploads from customer */
     DOCUMENT_COLLECTION,
     
     /** Under review by a loan officer or credit analyst */
     UNDER_REVIEW,
+
+    /** Under system or manual processing */
+    UNDER_PROCESSING,
+
+    /** Credit bureau report is being fetched */
+    BUREAU_PULL_IN_PROGRESS,
+
+    /** Detailed credit assessment in progress */
+    CREDIT_ASSESSMENT,
+
+    /** Awaiting field investigation report */
+    PENDING_FIELD_INVESTIGATION,
+
+    /** Awaiting legal or technical evaluation */
+    PENDING_LEGAL_TECHNICAL,
+
+    /** Pending approval from Credit Committee */
+    CREDIT_COMMITTEE,
+
+    /** Application approved but not yet sanctioned */
+    APPROVED,
+
+    /** Approved with specific conditions */
+    CONDITIONALLY_APPROVED,
     
     /** Sanction letter issued and approved */
     SANCTIONED,
+
+    /** Disbursement process has started */
+    DISBURSEMENT_IN_PROGRESS,
     
     /** Application rejected during review or by rule engine */
     REJECTED,
@@ -39,5 +69,8 @@ public enum LoanStatus {
     WITHDRAWN,
 
     /** Application cancelled by bank */
-    CANCELLED
+    CANCELLED,
+
+    /** Application in cancellation window (grace period) */
+    CANCELLATION_WINDOW
 }

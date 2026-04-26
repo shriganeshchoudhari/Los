@@ -300,21 +300,28 @@ public class DecisionEngineService {
     // ── Other operations ──────────────────────────────────────────────────────
 
     public DecisionResponseDto getDecision(String applicationId) {
-        Decision decision = decisionRepository.findByApplicationId(applicationId)
-                .orElseThrow(
-                        () -> new IllegalArgumentException("Decision not found for application: " + applicationId));
-        return mapToResponse(decision);
+        return decisionRepository.findByApplicationId(applicationId)
+                .map(this::mapToResponse)
+                .orElse(null);
     }
 
     public DecisionResponseDto manualOverride(ManualDecisionDto dto, String userId) {
         Decision decision = decisionRepository.findByApplicationId(dto.getApplicationId())
-                .orElseThrow(() -> new IllegalArgumentException("Decision not found"));
+                .orElseGet(() -> {
+                    Decision d = new Decision();
+                    d.setId(UUID.randomUUID().toString());
+                    d.setApplicationId(dto.getApplicationId());
+                    d.setDecisionType(DecisionType.MANUAL);
+                    return d;
+                });
 
         DecisionStatus previousStatus = decision.getStatus();
         decision.setStatus(dto.getStatus());
         decision.setFinalDecision(dto.getDecision());
         decision.setRejectionReason(dto.getRejectionReasonCode());
         decision.setRemarks(dto.getRemarks());
+        decision.setApprovedAmount(dto.getApprovedAmount());
+        decision.setApprovedTenureMonths(dto.getApprovedTenureMonths());
         decision.setDecidedBy(userId);
         decision.setDecidedAt(LocalDateTime.now());
 

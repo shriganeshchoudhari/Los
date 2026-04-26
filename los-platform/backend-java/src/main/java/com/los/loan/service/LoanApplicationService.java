@@ -32,6 +32,8 @@ public class LoanApplicationService {
         LoanApplication application = new LoanApplication();
         application.setApplicationNumber("LA-" + System.currentTimeMillis());
         application.setCustomerId(dto.getCustomerId());
+        application.setUserId(dto.getCustomerId()); // Mapping customerId to userId for legacy compatibility
+        application.setApplicantFullName(dto.getPurpose()); // Using purpose as a placeholder for now
         application.setLoanType(dto.getLoanType());
         application.setRequestedAmount(dto.getRequestedAmount());
         application.setTenureMonths(0); // Will be set during approval
